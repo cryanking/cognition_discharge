@@ -30,34 +30,38 @@ cpap_vs_surgery <- read_xlsx("2020_01_King_ProcedureCodes_MostRecentCPAP.xlsx", 
 
 
 Signals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                      sheet = "Signals", na = "NULL", col_types = c("text", 
-                                                                    "text", "date", "date", "date", 
-                                                                    "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                    "numeric", "numeric", "numeric"))
+                      sheet = "Signals", na = "NULL", 
+                      col_types = c(
+                        "text", 
+                        "text", "date", "date", "date", 
+                        "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric", "numeric", "numeric", 
+                        "numeric", "numeric", "numeric"))
 
 
 TextSignals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                          sheet = "TextSignals",na = "NULL", col_types = c("text", 
-                                                                           "numeric", "numeric", "numeric", "numeric", 
-                                                                           "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                           "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                           "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                           "numeric", "numeric", "numeric", "numeric", "numeric", 
-                                                                           "numeric", "numeric", "numeric", "numeric", "numeric"))
+                          sheet = "TextSignals",na = "NULL", 
+                          col_types = c(
+                            "text", 
+                            "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric"))
 
 FreeText <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                       sheet = "FreeText", na = "NULL", col_types = c("text", 
-                                                                      "text", "text", "text"))
+                       sheet = "FreeText", na = "NULL", 
+                       col_types = c("text","text", "text", "text"))
 
 ## you never use this
 # Dictionary <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
@@ -65,8 +69,7 @@ FreeText <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
 #                                                                           "numeric","numeric","text"))
 
 ProcedureCodes <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                             sheet = "ProcedureCodes",na = "NULL", col_types = c("text", 
-                                                                                 "text", "text", "numeric", "text"))
+                             sheet = "ProcedureCodes",na = "NULL", col_types = c("text", "text", "text", "numeric", "text"))
 
 
 other <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
@@ -74,8 +77,7 @@ other <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
                                                                 "text", "numeric"))
 
 new_procedure_code <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                                 sheet = "ProcedureCodes",na = "NULL", col_types = c("text", 
-                                                                                     "text", "text", "numeric", "text"))
+                                 sheet = "ProcedureCodes",na = "NULL", col_types = c("text", "text", "text", "numeric", "text"))
 
 # signals_procedure = Signals %>% left_join(CDS_ADT, by="REFERENCE_NO = CPAPPatientID")
 ## CRK this is never used
