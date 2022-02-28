@@ -1,31 +1,36 @@
-library(tidyverse) 
+# LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check:/research/' bsub -G 'compute-christopherking' -n 8 -R 'rusage[mem=64GB] span[hosts=1]' -M 64GB -q general-interactive -Is -a 'docker(cryanking/verse_words:1.2)' R
+
+
+# library(tidyverse) 
 library(lubridate) 
 library(readxl)
 library(magrittr)
-library(dplyr)
+library(dplyr) 
 library(forcats)
 library(readr)
-library(lubridate)
-library(table1)
 library(data.table)
-CDS_ADT <- read_csv("CDS ADT.csv", col_types = cols(REFERENCE_NO = col_number(), 
-                                                    REG_NO = col_number(), FACILITY_CONCEPT_ID = col_number()))
+library(splines)
+## again, you basically always want to treat ID numbers as strings. You don't want to do any "number" operations on them, and you don't want it to think that it can store them like floats. Int64 support isn't built into all packages.
+CDS_ADT <- read_csv("CDS ADT.csv", col_types = cols(REFERENCE_NO = col_character(), 
+                                                    REG_NO = col_character(), FACILITY_CONCEPT_ID = col_character()))
 
-
+## there is built in support for datetime conversion if you are going through the trouble to do this
 X2020_02_MV_LoS <- read_csv("2020_02_MV_LoS.csv", 
-                            col_types = cols(PatientID = col_number(), 
-                                             PAN = col_double(),
-                                             EMPI = col_double(),
-                                             ADMIT_TMSTP = col_character(),
-                                             DISCHARGE_TMSTP = col_character(),
+                            col_types = cols(PatientID = col_character(), 
+                                             PAN = col_character(),
+                                             EMPI = col_character(), 
+                                             ADMIT_TMSTP = col_datetime(),
+                                             DISCHARGE_TMSTP = col_datetime(),
                                              LoS_Days = col_double()
                                              ), na = "NULL")
-cpap_vs_surgery <- read_excel("2020_01_King_ProcedureCodes_MostRecentCPAP.xlsx", sheet= "MostRecentCPAP",na = "NULL", col_types =c("numeric","text", "numeric", "date"))
+
+## fixing classes, switching to read_xlsx since it is an xlsx file
+cpap_vs_surgery <- read_xlsx("2020_01_King_ProcedureCodes_MostRecentCPAP.xlsx", sheet= "MostRecentCPAP",na = "NULL", col_types =c("text","date", "text", "date"))
 
 
 
-Signals <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                      sheet = "Signals", na = "NULL", col_types = c("numeric", 
+Signals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                      sheet = "Signals", na = "NULL", col_types = c("text", 
                                                                     "text", "date", "date", "date", 
                                                                     "numeric", "numeric", "numeric", "numeric", 
                                                                     "numeric", "numeric", "numeric", "numeric", "numeric", 
@@ -41,8 +46,8 @@ Signals <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
                                                                     "numeric", "numeric", "numeric"))
 
 
-TextSignals <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                          sheet = "TextSignals",na = "NULL", col_types = c("numeric", 
+TextSignals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                          sheet = "TextSignals",na = "NULL", col_types = c("text", 
                                                                            "numeric", "numeric", "numeric", "numeric", 
                                                                            "numeric", "numeric", "numeric", "numeric", "numeric", 
                                                                            "numeric", "numeric", "numeric", "numeric", "numeric", 
@@ -50,25 +55,26 @@ TextSignals <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
                                                                            "numeric", "numeric", "numeric", "numeric", "numeric", 
                                                                            "numeric", "numeric", "numeric", "numeric", "numeric"))
 
-FreeText <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                       sheet = "FreeText", na = "NULL", col_types = c("numeric", 
-                                                                      "numeric", "text", "text"))
+FreeText <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                       sheet = "FreeText", na = "NULL", col_types = c("text", 
+                                                                      "text", "text", "text"))
 
-Dictionary <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                         sheet = "Dictionary", na = "NULL", col_types = c("text", 
-                                                                          "numeric","numeric","text"))
+## you never use this
+# Dictionary <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+#                          sheet = "Dictionary", na = "NULL", col_types = c("text", 
+#                                                                           "numeric","numeric","text"))
 
-ProcedureCodes <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                             sheet = "ProcedureCodes",na = "NULL", col_types = c("numeric", 
+ProcedureCodes <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                             sheet = "ProcedureCodes",na = "NULL", col_types = c("text", 
                                                                                  "text", "text", "numeric", "text"))
 
 
-other <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                    sheet = "Other", na = "NULL", col_types = c("numeric", 
+other <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                    sheet = "Other", na = "NULL", col_types = c("text", 
                                                                 "text", "numeric"))
 
-new_procedure_code <- read_excel("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                                 sheet = "ProcedureCodes",na = "NULL", col_types = c("numeric", 
+new_procedure_code <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                                 sheet = "ProcedureCodes",na = "NULL", col_types = c("text", 
                                                                                      "text", "text", "numeric", "text"))
 
 # signals_procedure = Signals %>% left_join(CDS_ADT, by="REFERENCE_NO = CPAPPatientID")
@@ -87,10 +93,38 @@ other %<>% semi_join(first_visit, by= "CPAPPatientID", na_matches="never")
 ## CRK you probably want to apply the age filter before selecting the "first_visit"
 ## similarly, you'd like to coalese SBTs (backwards in time) - I haven't looked to see if there are cases were the cognition measures are absent at a later time (sometime people forget to do them)
 
+## there are only 1047 patients matching this set of procedures!
+## I don't think we expected this to be so small
+## the inner join here is a choice that might need to be returned to - having the other-procedure patients in the regression helps estimate the effect of covariates.
+
+
 signals_procedure <- Signals %>% filter(Age_at_CPAP >= 65)   %>% 
   filter(!is.na(AD8) ) %>% filter(!is.na(SBT) ) %>% 
-  left_join(ProcedureCodes %>% filter(ICD_CODE_VERSION == "9-CM" | ICD_CODE_VERSION =="10-PCS") %>% filter( ICD_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")) %>% distinct(CPAPPatientID, .keep_all=T), by="CPAPPatientID")
+  inner_join(ProcedureCodes %>% filter(ICD_CODE_VERSION == "9-CM" | ICD_CODE_VERSION =="10-PCS") %>% filter( ICD_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")) %>% distinct(CPAPPatientID, .keep_all=T), by="CPAPPatientID")
 
+## 0FT20ZZ (liver resection) is not in the analysis plan
+## 
+  
+signals_procedure %<>% mutate(SurgeryType = case_when(
+                              ICD_PROCEDURE_CODE == "51.23" | ICD_PROCEDURE_CODE == "0FT44ZZ" ~ 'cholecystectomy', 
+                              ICD_PROCEDURE_CODE == "45.8" | ICD_PROCEDURE_CODE == "0DTN0ZZ" ~ 'Colectomy', 
+                              ICD_PROCEDURE_CODE == "43.82" | ICD_PROCEDURE_CODE == "0DB64Z3" ~ 'Gastrectomy',
+                              ICD_PROCEDURE_CODE == "52.7" | ICD_PROCEDURE_CODE == "0FBG0ZZ" ~ 'whipple',
+                              ICD_PROCEDURE_CODE == "68.4" | ICD_PROCEDURE_CODE == "0UT90ZZ" |ICD_PROCEDURE_CODE == "68.5"|ICD_PROCEDURE_CODE =="68.9" ~ 'Hysterectomy',
+                              ICD_PROCEDURE_CODE == "68.49" | ICD_PROCEDURE_CODE == "0UB74ZZ" ~ 'Hysterectomy',
+                              ICD_PROCEDURE_CODE == "52.0" | ICD_PROCEDURE_CODE ==  "0FBG3ZZ" ~ 'pancreatectomy',
+                              ICD_PROCEDURE_CODE == "81.06" | ICD_PROCEDURE_CODE == "0SG00A0" ~ 'lumbarFusion',
+                              ICD_PROCEDURE_CODE == "81.54" | ICD_PROCEDURE_CODE == "0SRC0J9" ~ 'totalKneeArthropathy',
+                              ICD_PROCEDURE_CODE == "81.51" | ICD_PROCEDURE_CODE == "0SRB04Z" ~ 'totalHip',
+                              ICD_PROCEDURE_CODE == "81.80" | ICD_PROCEDURE_CODE == "0RRJ00Z" ~ 'totalShoulder',
+                              ICD_PROCEDURE_CODE == "53.9" | ICD_PROCEDURE_CODE ==  "0DQ53ZZ" ~ 'laproscopicHiatalHernia',
+                              ICD_PROCEDURE_CODE == "32.49" | ICD_PROCEDURE_CODE == "32.41" ~ 'lobectomy',
+                              ICD_PROCEDURE_CODE == "55.4" | ICD_PROCEDURE_CODE == "0TT10ZZ" ~ 'Nephrectomy',
+                              ICD_PROCEDURE_CODE == "60.5" | ICD_PROCEDURE_CODE == "0VT08ZZ" ~ 'Prostatectomy',
+                              ICD_PROCEDURE_CODE == "57.71" | ICD_PROCEDURE_CODE == "0TTBOZZ" ~ 'Cystectomy',
+                              ICD_PROCEDURE_CODE == "39.52" | ICD_PROCEDURE_CODE == "39.53" ~ 'Arteriovenous'))
+  
+  
 ## CRK little typo here (was self-joined) - best practice to specify the by
 signals_procedure<- signals_procedure %>% left_join(TextSignals, by = "CPAPPatientID")
 #part-1
@@ -224,9 +258,15 @@ other_than_home %>% filter(dc_status != "missing") %>% mutate(
       , family=binomial() ) %>% summary %>% extract2("coefficients") %>% 
     extract("AbnCogTRUE",-3, drop=F) 
 
+
 ## adding in these adjusting variables already makes it non-significant, but doesn't change the point estimate much; it's just that abnormal cognition is closely correlated to them
 #              Estimate Std. Error  Pr(>|z|)
 # AbnCogTRUE -0.4176495  0.4040873 0.3013408
+
+## it is often worthwhile to get rid of column names with spaces to avoid all this escaping with something like
+## colnames(df) <- make.names(colnames(df)) 
+## this is an alias for `colnames<-`(df, new_values) , which like the other <- functions modifies its arguments (there is only 1 place that I remember where R cares about white space: a <- -b (assign the value of b *-1 to a) is different from a<--b (assign the value of b to a in the global scope) )
+
 
 ## you can also add splines or smoothing splines (in the MASS package), this is a b-spline with 3 degrees of freedom
 other_than_home %>% filter(dc_status != "missing") %>% mutate(
@@ -258,7 +298,8 @@ other_than_home %>% filter(dc_status != "missing") %>% mutate(
 
 
 
-## you can generate this formula as a string
+## you can generate this formula as a string if you want to re-use it and save space, but you'll want to fix names with spaces in them first, like above
+## formula(paste( "y ~" , paste( array_of_variable_names, collapse=" + ")  ) )
     
     
 
@@ -299,46 +340,166 @@ other_than_home %>% filter(dc_status != "missing") %>% mutate(
 # dev.off()
 
 
-
+## again, please give a meaningful organizational comment on the purpose of this section of code
 #part-2
+
+## I am going to use the CDS_ADT data file to define readmissions instead of name+dob matching, but I left all these comments and code changes so that you can see why these were incorrect
+if(FALSE) {
 surgery <- left_join(cpap_vs_surgery, X2020_02_MV_LoS, by = c("Surg_PatientID" = "PatientID") )
 filtered_mereged_data1<- left_join(signals_procedure, surgery, by = c("CPAPPatientID" = "CPAP_PatientID"))
+## why discard the time part of the timestamps?
 filtered_mereged_data1$Admission<-as_date(ymd_hms(filtered_mereged_data1$ADMIT_TMSTP,tz=NULL)) 
 filtered_mereged_data1$Discharge<-as_date(ymd_hms(filtered_mereged_data1$DISCHARGE_TMSTP,tz=NULL))
 filtered_mereged_data1$Surgery<-as_date(filtered_mereged_data1$Surgery_Date,tz=NULL)
+
 filtered_mereged_data1 %<>% mutate(new_id = openssl::md5(paste(NAME, DoB)))
-temp_dataset <- data.table(filtered_mereged_data1)
-setkey(temp_dataset, new_id, Admission,Surgery, Discharge)
-final_dataset <- temp_dataset[ , Daydiff_AdmissionDischarge := as.numeric(difftime(Discharge, shift(Admission, n = 1L, fill = 0, type = "lag"), units="days")), by = "new_id"]
-final_dataset$Daydiff_AdmissionDischarge <- ifelse(final_dataset$Daydiff_AdmissionDischarge>=10000, NA, final_dataset$Daydiff_AdmissionDischarge)
-readmited_list = ifelse(abs(final_dataset$Daydiff_AdmissionDischarge) <= 30, 1, 0)
-final_dataset2 <- final_dataset %>% mutate(readmited_30_days = as.numeric(readmited_list)) 
-readmitted_within30_dataset <- final_dataset2[final_dataset2$readmited_30_days>0]
+final_dataset <- data.table(filtered_mereged_data1)
+setkey(final_dataset, new_id, Admission)
+## keys aren't free - set keys when you plan to need them to fetch data efficently. If you want to order a dataset you can setorder which is cheaper
+## 
+## this is usually not what you want to do; the := operator in data.table is for in-place modification.
+## data.table, unlike almost everything else in R does not respect the copy-on-write principal
+## so for example, when you create final_dataset here, if you make change in it they will *also* change temp_dataset (because they are pointer to the same objects) and vice versa. you can explicity dt2 <- copy(dt1) if you really need to
+## although dplyr verbs (like mutate) work on data.table, you generally want to pick one of the two to avoid this kind of problem
+## using dplyr verbs on data.table objects often sacrifices the performance gains of data.table
 
-Abnormal_AD8<- filter(readmitted_within30_dataset, AD8>=2)
-readmitted_abnormalAD8<-length(Abnormal_AD8$AD8)
+final_dataset[ , Daydiff_AdmissionDischarge := as.numeric(difftime(Discharge, shift(Admission, n = 1L, fill = 0, type = "lag"), units="days")), by = "new_id"]
+#final_dataset$Daydiff_AdmissionDischarge <- ifelse(final_dataset$Daydiff_AdmissionDischarge>=10000, NA, final_dataset$Daydiff_AdmissionDischarge)
+## why using abs? you used Admission as a key; they are already sorted. 
+## ifelse is inferior to if_else (dplyr) and fifelse (data.table) - it doesn't check type consistency and is slower
+## you don't have to if_else(test, 1, 0) ; test (logical) can be used anywhere a numeric can (it is similar to python in this regard)
+#readmited_list = ifelse(abs(final_dataset$Daydiff_AdmissionDischarge) <= 30, 1, 0)
+#final_dataset2 <- final_dataset %>% mutate(readmited_30_days = as.numeric(readmited_list)) 
 
-Normal_AD8<- filter(readmitted_within30_dataset, AD8<2)
-readmitted_normalAD8<-length(Normal_AD8$AD8)
+## in dplyr (the efficency of this operation depends on what other packages you are using that affect this backend):
+## final_dataset %<>% mutate( readmited_30_days = Daydiff_AdmissionDischarge <= 30  )
+## in data.table
+final_dataset [ , readmited_30_days := Daydiff_AdmissionDischarge <= 30]
 
-Abnormal_SBT<-filter(readmitted_within30_dataset, SBT>=5)
-readmitted_abnormalSBT<-length(Abnormal_SBT$SBT)
+## you don't have to dt[dt$var < val ] like Pandas, dt[ var < val] 
+## and you turned a logical into a numeric just to check > 0 !
+##  as.numeric(test) > 0 usually works in R, but as you know this is generally an unsafe way to check conditions
+##  unlike base R dataframes, they data.table doesn't like dt[var] to get rows where var is true, prefers dt[var == TRUE] (T is also an alias of TRUE)
+##  also, this is the wrong analysis. you want to compare those readmitted vs not rather than generating counts
+# readmitted_within30_dataset <- final_dataset2[ readmited_30_days == TRUE]
 
-Normal_SBT<-filter(readmitted_within30_dataset, SBT<5)
-readmitted_normalSBT<-length(Normal_SBT$SBT)
+## same as above, you can use the summarize methods in dplyr or the by methods in data.table instead of making a bunch of global variables
+## illustrating data.table's fcase since I used dplyr's case_when above
+readmitted_within30_dataset[ , abnormal_cog := fcase (
+  is.na(AD8) & is.na(SBT), NA ## the default type of NA is logical, but there are NA_real_ NA_character_ etc
+  is.na(ADB), SBT>=5L, ## 5L is the integer, although comparing an integer to a float usually works it sometimes gets equality wrong
+  is.na(SBT), AD8 >= 2L,
+  default = AD8 >= 2L | SBT>=5L  ## unlike case_when, instead of making the default condition what happens with a fixed TRUE condition, explicity name the default
+  )  ] 
 
-titles <- c("readmitted_abnormalAD8", "readmitted_normalAD8", "readmitted_abnormalSBT", "readmitted_normalSBT")
-values <- c(readmitted_abnormalAD8, readmitted_normalAD8, readmitted_abnormalSBT, readmitted_normalSBT)
-out_of <- c(length(readmitted_within30_dataset$readmited_30_days), length(readmitted_within30_dataset$readmited_30_days), length(readmitted_within30_dataset$readmited_30_days), length(readmitted_within30_dataset$readmited_30_days))
-df <- data.frame(titles, values, out_of)
-df
+## in data.table .() is an alias of list()
+readmitted_within30_dataset[ , .(readmit_rate = mean(readmited_30_days , na.rm=TRUE), num=.N ), by="abnormal_cog"] %>% print  
 
-labels <- c("abnormalAD8", "normalAD8", "abnormalSBT", "normalSBT")
-values <- c(readmitted_abnormalAD8, readmitted_normalAD8, readmitted_abnormalSBT, readmitted_normalSBT)
-png(file = "Readmissions")
-barplot(values,names.arg= labels,xlab="cognition",ylab="values",col="blue",
-        main="Readmissions with in 30 days chat",border="red")
-dev.off()
+
+## nrow(dt) is what you're looking for instead of length(dt$var), or maybe sum(is.finite(dt$var))
+#out_of <- c(length(readmitted_within30_dataset$readmited_30_days), length(readmitted_within30_dataset$readmited_30_days), length(readmitted_within30_dataset$readmited_30_days), length(readmitted_within30_dataset$readmited_30_days))
+} else {
+
+############
+## part 2: creating the readmission outcome and predicting it with cognition status
+############
+
+## generating the readmission outcome
+## join the readmission data to the LOS data file as an intermediate
+## note that the CDS_ADT file has the REFERENCE_NO padded to 24 characters wide for no good reason
+  ## the package::object notation gets something from an unloaded package that is marked as ok to export, the package:::object notation gets private objects as well
+X2020_02_MV_LoS$EMPI %<>% stringr::str_pad(string=., width=24, side="left", pad="0")
+  ## the %<>% (pipe and assign) operator when given a function on the RHS does not need parens
+CDS_ADT$ROOM_START_DATE %<>% ymd_hms 
+  ## you can chain using %<>% and it uses the final value
+## we are only interested in admissions after discharge, I also remove any that are close to the discharge timestamps to eliminate "discharges" that are really transfers (this happens sometimes from the psych-inpatient to regular medicine services)
+  ## the ddays is a handy function in lubridate for doing shifts on datetimes
+  ## the dplyr::between and data.table::between functions are in their simplest uses the same, but they have different function signatures; whichever package was loaded last is used unless you specify!
+  ## I do something here unusual for me and create a global var to simplify the expression
+readmitted_pid <- X2020_02_MV_LoS %>%  left_join(CDS_ADT, by=c("EMPI"="REFERENCE_NO" ) ) %>% filter( data.table::between(ROOM_START_DATE , DISCHARGE_TMSTP+ddays(.25), DISCHARGE_TMSTP+ddays(30) )  ) %>% pull("PatientID") %>% unique
+  
+
+
+## join CPAP data to the LOS data file 
+  ## inner join gets rid of any CPAP visits with no matched surgery event
+  ## there are 9782 such non-matches, so I will go back to the "raw-raw" data and get the bigger set of maps
+joined_ADT <- signals_procedure %>%  inner_join( cpap_vs_surgery %>% select(CPAP_PatientID, Surg_PatientID), by = c("CPAPPatientID"="CPAP_PatientID") ) %>%
+  mutate(readmitted_in_30= Surg_PatientID %in%  readmitted_pid )
+
+  ## I won't repeat everything from above  
+joined_ADT %>% mutate(
+  AbnCog =  case_when(
+    is.na(AD8) & is.na(SBT) ~ NA ,
+    is.na(AD8) ~ SBT>=5 ,
+    is.na(SBT) ~ AD8>=2 ,
+    TRUE ~ AD8>=2 | SBT>=5 ) ) %>% 
+    glm(data=., 
+      readmitted_in_30 ~ AbnCog
+      , family=binomial() ) %>% summary %>% extract2("coefficients") %>% 
+    extract("AbnCogTRUE",-3, drop=F) 
+
+#             Estimate Std. Error   Pr(>|z|)
+# AbnCogTRUE 0.1007585 0.04891816 0.03942384
+
+joined_ADT %>% mutate(
+  AbnCog =  case_when(
+    is.na(AD8) & is.na(SBT) ~ NA ,
+    is.na(AD8) ~ SBT>=5 ,
+    is.na(SBT) ~ AD8>=2 ,
+    TRUE ~ AD8>=2 | SBT>=5 ) ) %>% 
+    glm(data=., 
+      readmitted_in_30 ~ AbnCog + Hypertension + `Coronary artery disease` + `Atrial fibrillation or flutter history` +  `Cerebrovascular disease` + `Diabetes mellitus`
+      , family=binomial() ) %>% summary %>% extract2("coefficients") %>% 
+    extract("AbnCogTRUE",-3, drop=F) 
+
+#             Estimate Std. Error  Pr(>|z|)
+# AbnCogTRUE 0.1058638  0.3869793 0.7844194
+
+## examining surgery-specific effective
+## I switched from base-R to tidy type manipulation because it got a little more complex
+## this kind of output with v large standard errors is ususally because of perfect separation
+
+joined_ADT %>% mutate(
+  AbnCog =  case_when(
+    is.na(AD8) & is.na(SBT) ~ NA ,
+    is.na(AD8) ~ SBT>=5 ,
+    is.na(SBT) ~ AD8>=2 ,
+    TRUE ~ AD8>=2 | SBT>=5 ) ) %>% 
+    glm(data=., 
+      readmitted_in_30 ~ AbnCog*SurgeryType
+      , family=binomial(), contrasts=list(SurgeryType="contr.sum") ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+## there are only 1007 patients whose surgery type is classified, so this approach is not going to work just yet
+joined_ADT$SurgeryType %>% table
+#        Arteriovenous      cholecystectomy            Colectomy 
+#                    4                   73                   29 
+#           Cystectomy          Gastrectomy         Hysterectomy 
+#                   61                    5                  111 
+#            lobectomy         lumbarFusion          Nephrectomy 
+#                   42                   43                   52 
+#        Prostatectomy             totalHip totalKneeArthropathy 
+#                   77                   13                  213 
+#        totalShoulder              whipple 
+#                  135                  149 
+      
+joined_ADT %>% filter(SurgeryType == "cholecystectomy") %>% mutate(
+  AbnCog =  case_when(
+    is.na(AD8) & is.na(SBT) ~ NA ,
+    is.na(AD8) ~ SBT>=5 ,
+    is.na(SBT) ~ AD8>=2 ,
+    TRUE ~ AD8>=2 | SBT>=5 ) ) %>% 
+    glm(data=., 
+      readmitted_in_30 ~ AbnCog
+      , family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+
+
+
+
+}
+
+
+## CRK I stopped here
 
 #part-3
 Surg_discharge<-temp_dataset[, Daydiff_SurgeryDischarge := as.numeric(difftime(Discharge, Surgery), units = "days"), by = "CPAPPatientID"] 
