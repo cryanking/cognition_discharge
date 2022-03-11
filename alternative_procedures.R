@@ -70,3 +70,75 @@ CPAP_mapping <- datapreop %>% select(Surg_PatientID, Data_PatientID, EMPI, MRN, 
 
 write_csv(CPAP_mapping, file="/research/ActFast_Intermediates/CPAP_to_surg.csv"  )
 
+
+###############
+##Experimenting on the data
+#################
+
+# it has 1220 rows matching with procedure codes
+signals_procedure <- Signals %>% filter(Age_at_CPAP >= 65)   %>%
+  filter(!is.na(AD8) ) %>% filter(!is.na(SBT) ) %>%
+  inner_join(ProcedureCodes %>% filter(ICD_CODE_VERSION == "9-CM" | ICD_CODE_VERSION =="10-PCS") %>% filter( ICD_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")) %>% distinct(CPAPPatientID, .keep_all=T), by="CPAPPatientID")
+
+num_overlap(Signals, procedure_data) # I dont see any common Id's in this datasets to join them
+num_overlap(Signals, all_ids) # I dont see any common Id's in this datasets to join them
+num_overlap(Signals, CPAP_mapping) # i see signals$ CPAPPatientID and Data_PatientID has 24968 matchings but there are missing rows as well.
+
+# I got 24293 matchings b/w Signals and CPAP_mapping
+signal_preop <- Signals %>% filter(Age_at_CPAP >= 65) %>%
+  filter(!is.na(AD8) ) %>% filter(!is.na(SBT)) %>%
+  inner_join(CPAP_mapping, by= c("CPAPPatientID" = "Data_PatientID"))
+
+num_overlap(signal_preop, procedure_data)
+# I joined signals and procedure_data(CDS Procedures.csv) and got 7283 matches
+procedures_data <- procedure_data %>% filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))  
+signals_procedures <- signal_preop %>% inner_join(procedures_data, by = c("Surg_PatientID" = "PatientID"))
+# there is difference b/w signals with ProcedureCodes(1220) and Signals with procedure_data(2048)
+
+
+#combining Actfast_proc2 with cpap_mapping and filtering it with ICD_procedures and then combining it with signals
+# I found this is not the best way
+num_overlap(Actfast_proc2, CPAP_mapping)
+Actfastproc2_cpapMapping <- Actfast_proc2 %>% inner_join(CPAP_mapping, by=c("PatientID" = "Data_PatientID")) %>%
+  filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
+num_overlap(Signals, Actfastproc2_cpapMapping)
+
+
+
+# I joined signal_preop with Actfast_proc2 by PatientID(2767) and by PAN(2937). Which combination is better?
+num_overlap(signal_preop, Actfast_proc2)
+signal_preop2<- signal_preop %>% inner_join(Actfast_proc2, by=c("Surg_PatientID" = "PatientID")) %>%
+  filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
+
+signal_preop3<- signal_preop %>% inner_join(Actfast_proc2, by= "PAN") %>%
+  filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
+
+# missing data b/w signal_preop2 and signal_preop3 is around 689 rows
+missing_data <- signal_preop2 %>% anti_join(signal_preop3, by = c("Surg_PatientID" = "PatientID"))
+
+
+
+#I joined signal_preop with Actfast_proc_late by PatientID(825), PAN(1289), MRN(1674). Which combination is better?
+
+num_overlap(signal_preop, actfast_proc_late)
+
+signal_preop_proc_late<-signal_preop %>% inner_join(actfast_proc_late, by = c("Surg_PatientID" = "PatientID")) %>%
+  filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
+
+signal_preop_proc_late1<-signal_preop %>% inner_join(actfast_proc_late, by = c("PAN" = "REG_NO")) %>%
+  filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
+
+signal_preop_proc_late2<-signal_preop %>% inner_join(actfast_proc_late, by = "MRN" ) %>%
+  filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
+
+# missing data b/w signal_preop_proc_late and signal_preop_proc_late1 is around 2 rows
+missing_data1 <- signal_preop_proc_late %>% anti_join(signal_preop_proc_late1, by = c("Surg_PatientID" = "PatientID"))
+
+#missing data b/w signal_preop_proc_late and signal_preop_proc_late2 is around 0 rows
+missing_data2 <- signal_preop_proc_late %>% anti_join(signal_preop_proc_late2, by = c("Surg_PatientID" = "PatientID"))
+
+
+
+
+
+
