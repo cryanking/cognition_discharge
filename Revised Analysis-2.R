@@ -76,9 +76,6 @@ other <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
                     sheet = "Other", na = "NULL", col_types = c("text", 
                                                                 "text", "numeric"))
 
-new_procedure_code <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
-                                 sheet = "ProcedureCodes",na = "NULL", col_types = c("text", "text", "text", "numeric", "text"))
-
 # signals_procedure = Signals %>% left_join(CDS_ADT, by="REFERENCE_NO = CPAPPatientID")
 ## CRK this is never used
 # mergedata <- merge(Signals, CDS_ADT, by.x = c("CPAPPatientID"), by.y = ("REFERENCE_NO"), all.y=TRUE)
@@ -103,6 +100,19 @@ other %<>% semi_join(first_visit, by= "CPAPPatientID", na_matches="never")
 signals_procedure <- Signals %>% filter(Age_at_CPAP >= 65)   %>% 
   filter(!is.na(AD8) ) %>% filter(!is.na(SBT) ) %>% 
   inner_join(ProcedureCodes %>% filter(ICD_CODE_VERSION == "9-CM" | ICD_CODE_VERSION =="10-PCS") %>% filter( ICD_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")) %>% distinct(CPAPPatientID, .keep_all=T), by="CPAPPatientID")
+  
+#  temporary_data <-  Signals %>% filter(Age_at_CPAP >= 65)   %>% 
+#   left_join(ProcedureCodes %>% filter(ICD_CODE_VERSION == "9-CM" | ICD_CODE_VERSION =="10-PCS") %>% filter( ICD_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")) %>% distinct(CPAPPatientID, .keep_all=T), by="CPAPPatientID") %>% group_by(CPAPPatientID) %>% mutate(any_px_match = any(!is.na(ICD_PROCEDURE_CODE)) )
+#   
+#   outside_data_procedures <- procedure_data %>% filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
+# 
+#   outside_data_procedures %<>% inner_join(CPAP_mapping, by=c("REG_NO"="PAN") )
+#   
+#   overlap_temp <- temporary_data %>% inner_join( outside_data_procedures %>% mutate(Data_PatientID = as.character(Data_PatientID)) , by=c("CPAPPatientID"="Data_PatientID") )
+# overlap_temp %>% filter(CPAPPatientID=="1144254") %>% select(ICD_PROCEDURE_CODE, any_px_match, ICDX_PROCEDURE_CODE)
+# 
+# Signals %>% filter(CPAPPatientID == "1220052")
+# ProcedureCodes %>% filter(CPAPPatientID == "1220052")
 
 ## 0FT20ZZ (liver resection) is not in the analysis plan
 ## 

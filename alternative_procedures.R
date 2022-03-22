@@ -42,7 +42,7 @@ Actfast_proc <- read_xlsx(clore_new_cohort_location, sheet = "Procedures", col_t
 
 actfast_proc_late <- Actfast_proc %>% left_join(Actfast_roll %>% select(MRN, REG_NO, DOS), by="REG_NO") %>% inner_join(all_ids %>% select(PatientID,REG_NO=VisitIDCode ),  by="REG_NO")
 
-
+actfast_proc_late  %>% filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")) %>% pull("REG_NO") %>% n_distinct
 ### The recent I2 query
 ## this has 66816 distinct hospitalizations and 75948 distinct cases
 ## spans whole era - I have no idea why it is missing so many patients
