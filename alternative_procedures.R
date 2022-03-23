@@ -6,6 +6,68 @@ library(magrittr)
 library(dplyr)
 library(readr)
 
+CDS_ADT <- read_csv("CDS ADT.csv", col_types = cols(REFERENCE_NO = col_character(), 
+                                                    REG_NO = col_character(), FACILITY_CONCEPT_ID = col_character()))
+
+X2020_02_MV_LoS <- read_csv("2020_02_MV_LoS.csv", 
+                            col_types = cols(PatientID = col_character(), 
+                                             PAN = col_character(),
+                                             EMPI = col_character(), 
+                                             ADMIT_TMSTP = col_datetime(),
+                                             DISCHARGE_TMSTP = col_datetime(),
+                                             LoS_Days = col_double()
+                            ), na = "NULL")
+
+cpap_vs_surgery <- read_xlsx("2020_01_King_ProcedureCodes_MostRecentCPAP.xlsx", sheet= "MostRecentCPAP",na = "NULL", col_types =c("text","date", "text", "date"))
+
+
+Signals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                     sheet = "Signals", na = "NULL", 
+                     col_types = c(
+                       "text", 
+                       "text", "date", "date", "date", 
+                       "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric", "numeric", "numeric", 
+                       "numeric", "numeric", "numeric"))
+
+
+TextSignals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                         sheet = "TextSignals",na = "NULL", 
+                         col_types = c(
+                           "text", 
+                           "numeric", "numeric", "numeric", "numeric", 
+                           "numeric", "numeric", "numeric", "numeric", "numeric", 
+                           "numeric", "numeric", "numeric", "numeric", "numeric", 
+                           "numeric", "numeric", "numeric", "numeric", "numeric", 
+                           "numeric", "numeric", "numeric", "numeric", "numeric", 
+                           "numeric", "numeric", "numeric", "numeric", "numeric"))
+
+FreeText <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                      sheet = "FreeText", na = "NULL", 
+                      col_types = c("text","text", "text", "text"))
+
+
+ProcedureCodes <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                            sheet = "ProcedureCodes",na = "NULL", col_types = c("text", "text", "text", "numeric", "text"))
+
+
+other <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                   sheet = "Other", na = "NULL", col_types = c("text", 
+                                                               "text", "numeric"))
+
+new_procedure_code <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                                sheet = "ProcedureCodes",na = "NULL", col_types = c("text", "text", "text", "numeric", "text"))
+
+
 ########
 ## Comparing procedure code datasets
 ########
@@ -74,6 +136,23 @@ write_csv(CPAP_mapping, file="/research/ActFast_Intermediates/CPAP_to_surg.csv" 
 ###############
 ##Experimenting on the data
 #################
+
+
+num_overlap <- function(x, y) {
+  output <- matrix(NA, nrow=ncol(x), ncol=ncol(y))
+  rownames(output ) <- colnames(x)
+  colnames(output)  <- colnames(y)
+  for( i in seq(ncol(x))) {
+    for( j in seq(ncol(y))) {
+      output[i,j] <- intersect(as.character(x[[i]]), as.character(y[[j]])) %>% length
+    }
+  }
+  return(output)
+}
+
+############
+#step-1
+############
 
 # it has 1220 rows matching with procedure codes
 signals_procedure <- Signals %>% filter(Age_at_CPAP >= 65)   %>%
@@ -165,6 +244,9 @@ joined_ADT$SurgeryType %>% table
 #                   157 
 
 
+############
+#step-2
+############
 num_overlap(Signals, procedure_data) # I dont see any common Id's in this datasets to join them
 num_overlap(Signals, all_ids) # I dont see any common Id's in this datasets to join them
 num_overlap(Signals, CPAP_mapping) # i see signals$ CPAPPatientID and Data_PatientID has 24968 matchings but there are missing rows as well.
@@ -181,8 +263,11 @@ signals_procedures <- signal_preop %>% inner_join(procedures_data, by = c("Surg_
 # there is difference b/w signals with ProcedureCodes(1220) and Signals with procedure_data(2048)
 
 
-#combining Actfast_proc2 with cpap_mapping and filtering it with ICD_procedures and then combining it with signals
-# I found this is not the best way
+
+############
+#step-3
+############
+#joining Actfast_proc2 with cpap_mapping and filtering the ICD_procedures finally joined with signals. I found this is not the best way
 num_overlap(Actfast_proc2, CPAP_mapping)
 Actfastproc2_cpapMapping <- Actfast_proc2 %>% inner_join(CPAP_mapping, by=c("PatientID" = "Data_PatientID")) %>%
   filter( ICDX_PROCEDURE_CODE %in% c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53"))
@@ -373,6 +458,10 @@ missing_data <- signal_preop2 %>% anti_join(signal_preop3, by = c("Surg_PatientI
 
 
 
+############
+#step-4
+############
+
 #I joined signal_preop with Actfast_proc_late by PatientID(825), PAN(1289), MRN(1674). Which combination is better?
 
 num_overlap(signal_preop, actfast_proc_late)
@@ -414,7 +503,7 @@ joined_proc_late %>% mutate(
       , family=binomial() ) %>% summary %>% extract2("coefficients") %>% 
   extract("AbnCogTRUE",-3, drop=F) 
 
- #           Estimate Std. Error  Pr(>|z|)
+#           Estimate Std. Error  Pr(>|z|)
 #AbnCogTRUE 0.1394924  0.2668239 0.6011216
 
 
@@ -578,7 +667,7 @@ joined_proc_late2 %>% mutate(
       , family=binomial() ) %>% summary %>% extract2("coefficients") %>% 
   extract("AbnCogTRUE",-3, drop=F) 
 
- #           Estimate Std. Error    Pr(>|z|)
+#           Estimate Std. Error    Pr(>|z|)
 #AbnCogTRUE 0.6041601  0.1331939 5.73465e-06
 
 joined_proc_late2 %>% mutate(
