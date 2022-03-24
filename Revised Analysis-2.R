@@ -80,7 +80,9 @@ other <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
 ## CRK this is never used
 # mergedata <- merge(Signals, CDS_ADT, by.x = c("CPAPPatientID"), by.y = ("REFERENCE_NO"), all.y=TRUE)
 
+if(FALSE) {
 ## CRK this is almost right - you want to merge over (or take the last) visit before a given surgery.  
+## I will check out the other procedure data before commiting to this
 first_visit <- FreeText %>% select(CPAPPatientID,MRN) %>% inner_join(Signals %>% select(CPAPPatientID, Surgery_Date), by = "CPAPPatientID") %>% group_by(MRN) %>% slice_min( order_by="Surgery_Date", n=1 , with_ties=FALSE) %>% ungroup
 
 Signals %<>% semi_join(first_visit, by= "CPAPPatientID", na_matches="never")
@@ -88,13 +90,18 @@ TextSignals %<>% semi_join(first_visit, by= "CPAPPatientID", na_matches="never")
 FreeText %<>% semi_join(first_visit, by= "CPAPPatientID", na_matches="never")
 ProcedureCodes %<>% semi_join(first_visit, by= "CPAPPatientID", na_matches="never")
 other %<>% semi_join(first_visit, by= "CPAPPatientID", na_matches="never")
+}
+
+
 
 ## CRK you probably want to apply the age filter before selecting the "first_visit"
 ## similarly, you'd like to coalese SBTs (backwards in time) - I haven't looked to see if there are cases were the cognition measures are absent at a later time (sometime people forget to do them)
+## RESOLVED: it turns out that the age filter was applied in the data query
 
 ## there are only 1047 patients matching this set of procedures!
 ## I don't think we expected this to be so small
 ## the inner join here is a choice that might need to be returned to - having the other-procedure patients in the regression helps estimate the effect of covariates.
+## RESOLVED: the dataset is small enough that some of the more ambitious targets aren't feasible. We can come back to data augmentation, but I am skeptical that it will make a difference worth the effort
 
 
 signals_procedure <- Signals %>% filter(Age_at_CPAP >= 65)   %>% 
