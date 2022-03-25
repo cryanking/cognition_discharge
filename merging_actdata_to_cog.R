@@ -1,11 +1,15 @@
+## docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -f /code/merging_actdata_to_cog.R
 library(lubridate) 
 library(readxl)
 library(magrittr)
 library(dplyr) 
 library(forcats)
 library(readr)
-library(data.table)
 library(splines)
+library(nonnest2)
+library(modelr)
+library(purrr)
+library(pROC)
 
 setwd("/research")
 ## NOTE: this does NOT work for readmission timing / length of stay because this file does not contain discharge times!
@@ -44,6 +48,35 @@ Signals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
                         "numeric", "numeric", "numeric", "numeric", "numeric", 
                         "numeric", "numeric", "numeric", "numeric", "numeric", 
                         "numeric", "numeric", "numeric"))
+
+TextSignals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx", 
+                          sheet = "TextSignals",na = "NULL", 
+                          col_types = c(
+                            "text", 
+                            "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric", 
+                            "numeric", "numeric", "numeric", "numeric", "numeric"))
+
+
+TextSignals %<>% select(one_of("CPAPPatientID", "Sex", "Race", "Ethnicity", "Alcohol use", "Drinks/week", "Functional capacity", "Dialysis history", "Cirrhosis etiology", "Surgical Service") )
+
+TextSignals %<>% (janitor::clean_names)
+TextSignals$race %<>% as.factor %>% fct_other(keep=c("7","9")) %>% fct_recode(White="9", Black="7") %>% fct_explicit_na("Missing") %>% relevel(ref="White")
+
+## the base package ifelse doesn't check type consistency, which is a frequent source of difficult to detect bugs. use if_else (in tidyverse or fifelse in data.table)
+TextSignals %<>% mutate(current_heavy = if_else(sex==1, drinks_week > 16, drinks_week >10)%>% as.factor %>% fct_explicit_na ) %>% select(-one_of("drinks_week"))
+TextSignals$alcohol_use %<>% is_in(4:6) %>% as.factor %>% fct_explicit_na
+TextSignals$dialysis_history %<>% is_in(76:80)%>% as.factor %>% fct_explicit_na
+TextSignals$functional_capacity %<>% is_in(9:11)%>% as.factor %>% fct_explicit_na
+TextSignals$cirrhosis_etiology %<>% is_in(107:113)%>% as.factor %>% fct_explicit_na
+
+
+TextSignals %<>% rename(prior_heavy_alcohol=alcohol_use, low_functional_capacity=functional_capacity, cirrhosis=cirrhosis_etiology)
+
+Signals %<>% left_join(TextSignals  , by=c("CPAPPatientID"="cpap_patient_id")) 
 
 
 ## included procedure lists and categories
@@ -298,13 +331,14 @@ actfast_proc_filtered <- bind_cols(actfast_proc_filtered, encode_onehot(actfast_
 
 hosp_proc<- actfast_proc_filtered  %>% group_by(PAN) %>% mutate_at(vars(one_of("Age_at_CPAP"),starts_with("SType_") ), max)  %>%  slice_head( n=1 ) %>% ungroup
 
+hosp_proc %<>% filter(!is.na(SurgeryType))
+
 comborbid_vars <- setdiff(comborbid_vars, c("Cerebrovascular disease, stroke, or TIA", "TIA","Cerebrovascular disease" ))
 hosp_proc %<>% rename_with(.fn= . %>% gsub(pattern=" ", replacement="_", fixed=T) %>% gsub(pattern=",", replacement="", fixed=T), .cols=one_of(comborbid_vars))
 
 comborbid_vars %<>% gsub(pattern=" ", replacement="_", fixed=T) %>% gsub(pattern=",", replacement="", fixed=T)
 
 
-######### Analysis 1
 
 
 ######### Analysis 2
@@ -340,55 +374,64 @@ hosp_proc %>% summarize(
 # 1       0.0690  2768        0.140  2768  0.184    2768
 
 
-analysis_pipe <- . %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+analysis_pipe <- . %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+  glm(data=., formula=myform,  family=binomial() ) %>% 
+  summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
 ## surgery specific effects - build formulas externally because of the non-factor structure
+## save these building blocks for various models
+base_form <- "thisout ~ 0" %>% formula
 surg_vars <- colnames(hosp_proc) %>% grep(pattern="SType_", value=T)
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), "+" , paste0(surg_vars,":AbnCog" ,  collapse=" + ") ) %>% as.formula
+surg_form <- paste0(surg_vars, collapse=" + ")
+surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
+comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>% 
+  update( paste0("~.+", surg_interact_form) ) 
+  
 hosp_proc %>% analysis_pipe 
 
-# actfast_proc_filtered %>% exclude_rare %>% glm(data=.,  dc_status=="home" ~ 0 + SurgeryType + SurgeryType:AbnCog
-#       , family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
 ## and examine the surgery specific offsets - these are all relative to 0 (50%)
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + ") ) %>% as.formula
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) )
 
 hosp_proc %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=.,  formula=myform,
       , family=binomial()   ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(!grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
-# actfast_proc_filtered %>% exclude_rare %>% glm(data=.,  dc_status=="home" ~ 0 + SurgeryType 
-#       , family=binomial() , contrasts=list(SurgeryType="contr.sum") ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(!grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
 ## overall
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog" ) %>% as.formula
-hosp_proc %>% analysis_pipe
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) 
 
-# actfast_proc_filtered %>% exclude_rare %>% glm(data=.,  dc_status=="home" ~ 0 + SurgeryType + AbnCog
-#       , family=binomial() , contrasts=list(SurgeryType="contr.sum") ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+hosp_proc %>% analysis_pipe
 
 ## now adjust for age 
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog+ bs(Age_at_CPAP, 3)" ) %>% as.formula
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
+
+  
 hosp_proc %>% analysis_pipe
 
-# actfast_proc_filtered %>% exclude_rare %>% glm(data=.,  dc_status=="home" ~ 0 + SurgeryType + AbnCog + bs(Age_at_CPAP, 3) 
-#       , family=binomial() , contrasts=list(SurgeryType="contr.sum") ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
-## adjusting for some common diseases - r complained about the length of the input to formula()
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + ")) %>% as.formula
-myform %<>% update(paste0( "~ . + AbnCog" )) 
-myform %<>% update(paste0( "~ . + bs(Age_at_CPAP, 3) "))
-myform %<>% update(paste0( "~ . + " , paste0(comborbid_vars ,  collapse=" + ") ) )
+## adjusting for some common diseases 
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
 
 hosp_proc %>% analysis_pipe
 
-
-# actfast_proc_filtered %>% exclude_rare %>% glm(data=.,  dc_status=="home" ~ 0 + SurgeryType + AbnCog + bs(Age_at_CPAP, 3) + Hypertension + `Coronary artery disease` + `Atrial fibrillation or flutter history` +  CVA + `Diabetes mellitus`
-#       , family=binomial() , contrasts=list(SurgeryType="contr.sum") ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
 ## surgery-specific rates with adjustment
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + ")) %>% as.formula
-myform %<>% update(paste0( "~ . +" , paste0(surg_vars,":AbnCog" ,  collapse=" + ")) )
-myform %<>% update(paste0( "~ . + bs(Age_at_CPAP, 3) "))
-myform %<>% update(paste0( "~ . + " , paste0(comborbid_vars ,  collapse=" + ") ) )
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", surg_interact_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
 
 hosp_proc %>% analysis_pipe
 
@@ -411,7 +454,7 @@ readmit_set <- plain_admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE, RE
 
 hosp_proc %<>% mutate( readmit = PAN %in%  unique(readmit_set$PAN_AKA_REG_NO ) )
 
-## only 42 (1.5%), is implausibly small compared to the global 7.5%. this dataset must not contain all readmissions
+## only 11%
 hosp_proc %>%  pull("readmit") %>% table
 
 # length(intersect(hosp_proc$EMPI,  admission_log$REFERENCE_NO ))
@@ -419,7 +462,7 @@ hosp_proc %>%  pull("readmit") %>% table
 
 analysis_pipe <- . %>%filter(dc_status=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
-## overall - negative association!
+## overall - weak negative association
 myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog" ) %>% as.formula
 hosp_proc %>% analysis_pipe 
 
@@ -427,6 +470,23 @@ hosp_proc %>% analysis_pipe
 ## now adjust for age 
 myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog+ bs(Age_at_CPAP, 3)" ) %>% as.formula
 hosp_proc %>% analysis_pipe
+
+## and comorbid
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
+
+hosp_proc %>% analysis_pipe
+
+## surgery specific rates - a few singularities, nothing really stands out
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>% 
+  update( paste0("~.+", surg_interact_form) ) 
+  
+hosp_proc %>% analysis_pipe 
+
 
 # Secondary outcomes: 
 #     1. Hospital length-of-stay (time in days to discharge from time of index surgery)
@@ -437,60 +497,77 @@ hosp_proc %<>% left_join(admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE
 
 analysis_pipe <- . %>% filter(dc_status=="home") %>% mutate(thisout=LoS) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
 
-## overall - no association
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog" ) %>% as.formula
+## overall - no association (weakly negative)
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) 
 hosp_proc  %>% analysis_pipe
 
 ## now adjust for age 
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog+ bs(Age_at_CPAP, 3)" ) %>% as.formula
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
+
 hosp_proc %>% analysis_pipe
 
 ## adjust for comorbid
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + ")) %>% as.formula
-myform %<>% update(paste0( "~ . + AbnCog" )) 
-myform %<>% update(paste0( "~ . + bs(Age_at_CPAP, 3) "))
-myform %<>% update(paste0( "~ . + " , paste0(comborbid_vars ,  collapse=" + ") ) )
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
 hosp_proc %>% analysis_pipe
 
 
 ## adjusted surg-specific - a few are significant, but it's just multiple testing
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + ")) %>% as.formula
-myform %<>% update(paste0( "~ . +" , paste0(surg_vars,":AbnCog" ,  collapse=" + ")) )
-myform %<>% update(paste0( "~ . + bs(Age_at_CPAP, 3) "))
-myform %<>% update(paste0( "~ . + " , paste0(comborbid_vars ,  collapse=" + ") ) )
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", surg_interact_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
 hosp_proc %>% analysis_pipe
 
-## mortality - only 16
+## mortality - only 15
 mortality_data <- read_csv("metav.csv" , col_types=cols( MPI = col_character(), DATE_OF_DEATH=col_datetime(format="%Y-%m-%d-%H.%M.%S" )   ) )
-)
+
 hosp_proc %<>% left_join( mortality_data , by = c("EMPI" = "MPI") )
-hosp_proc %<>% mutate(death = DATE_OF_DEATH < DISCHARGE_DATE + ddays(2) | DATE_OF_DEATH < Surgery_Date + ddays(30))
+## add a window for death for unrecognized hospice
+## note that in R NA | TRUE is correctly TRUE
+hosp_proc %<>% mutate(death = DATE_OF_DEATH < DISCHARGE_DATE + ddays(2) | DATE_OF_DEATH < Surgery_Date + ddays(30) | dc_status=="hospice or death")
 hosp_proc %<>% mutate(death = if_else(is.na(death), FALSE, death ) )
 
 
 analysis_pipe <- . %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
 ## overall - no association
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog" ) %>% as.formula
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) 
 hosp_proc  %>% analysis_pipe
 
 ## now adjust for age 
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog+ bs(Age_at_CPAP, 3)" ) %>% as.formula
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
 hosp_proc %>% analysis_pipe
 
 ## adjust for comorbid
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + ")) %>% as.formula
-myform %<>% update(paste0( "~ . + AbnCog" )) 
-myform %<>% update(paste0( "~ . + bs(Age_at_CPAP, 3) "))
-myform %<>% update(paste0( "~ . + " , paste0(comborbid_vars ,  collapse=" + ") ) )
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
 hosp_proc %>% analysis_pipe
 
 
 ## adjusted surg-specific - blows up due to singularities
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + ")) %>% as.formula
-myform %<>% update(paste0( "~ . +" , paste0(surg_vars,":AbnCog" ,  collapse=" + ")) )
-myform %<>% update(paste0( "~ . + bs(Age_at_CPAP, 3) "))
-myform %<>% update(paste0( "~ . + " , paste0(comborbid_vars ,  collapse=" + ") ) )
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", surg_interact_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+bs(Age_at_CPAP, 3)" ) 
 hosp_proc %>% analysis_pipe
 
 # Analysis 3:
@@ -500,4 +577,84 @@ hosp_proc %>% analysis_pipe
 
 # Analysis 4:
 #     1. Comparative predictive value of AD8 and SBT 
+# some odd renaming to avoid having to modify other code
+# there are two common ways to compare non-nested models for predictive value: vuong / clarke type tests and hold out samples
 
+analysis_pipe_vu <- function(x) {
+g1 <- x %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g2 <- x %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
+vuongtest(g1, g2)
+}
+
+analysis_pipe_cv <- function(x) {
+
+  x2 <- x %>% mutate(thisout=dc_status=="home")
+    ## produce a shared set of cross-validation folds - note that dplyr / magrittr do not automatically know how to turn the fold-by-ref into a dataframe for manipulation, but they seems to have added a glm method
+  rs <- crossv_kfold(x2, k=100)
+  ## train the first model on all folds, then evaluate it on the hold out data using AUROC as a critereon - note the wrapper since at low frequency / sample size an evaluation set can have no events
+  r1 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
+    map2_dbl(rs$test, function(.x, .y){
+      response <- .y %>% as.data.frame %>% pull("thisout")
+      if(n_distinct(response) > 1 ) {
+        pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) )  ) %>% auc } else {NA_real_}
+    } )
+
+  r2 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
+    response <- .y %>% as.data.frame %>% pull("thisout")
+    if(n_distinct(response) > 1 ) {
+      pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) )  ) %>% auc } else {NA_real_}
+  } )
+  t.test(na.omit(r1), na.omit(r2) )
+}
+
+## subsampling will produce inconsistent age parameterizations and OOB errors
+global_age_spline <- bs(hosp_proc$Age_at_CPAP, 3)
+
+## overall - no difference either way
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) 
+hosp_proc  %>% analysis_pipe_vu
+hosp_proc  %>% analysis_pipe_cv
+
+
+## now adjust for age 
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
+hosp_proc  %>% analysis_pipe_vu
+hosp_proc  %>% analysis_pipe_cv
+
+## adjust for comorbid
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
+hosp_proc  %>% analysis_pipe_vu
+hosp_proc  %>% analysis_pipe_cv
+
+
+
+######### Analysis 1
+
+
+## this analysis isn't repeated, so there is no need to save the underlying changes
+# Analysis1table <- hosp_proc %>% 
+# mutate(bmi_cats = cut(BMI, breaks=c(14, 18.5, 25, 30, 35, 40, 61), right=FALSE ), male_sex = sex==1) %>% 
+# mutate(low_barthel = Barthel %>% is_less_than(100) %>% as.factor %>% fct_explicit_na ) %>%
+# mutate(abn_cog = AbnCog %>% as.factor %>% fct_recode(abnl="TRUE",nl="FALSE")) %>%
+# mutate_at(vars(one_of("Dialysis") ) , na_zero ) %>%
+#   table1::table1(~Age_at_CPAP + race + male_sex + bmi_cats  + Coronary_artery_disease + low_barthel + Congestive_heart_failure + Atrial_fibrillation_or_flutter_history + CVA + COPD + Asthma + Peripheral_artery_disease + Diabetes_mellitus + Current_cancer+current_heavy+prior_heavy_alcohol+low_functional_capacity+cirrhosis+Dialysis|abn_cog, data=.)
+
+saveRDS(hosp_proc, "merged_data.RDS" )
+save(comborbid_vars ,
+base_form ,
+surg_vars ,
+surg_form ,
+surg_interact_form ,
+comorbid_form ,
+analysis_pipe_vu,
+analysis_pipe_cv
+)
