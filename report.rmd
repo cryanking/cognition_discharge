@@ -1,0 +1,32 @@
+---
+output: 
+  bookdown::pdf_document2:
+    fig_caption: true
+    toc: false
+    extra_dependencies: ["amsmath", "colortbl"]
+title: "Preoperative Cognition and Surgical Outcomes Results"
+author: 
+ - "C Ryan King, MD PhD"
+ 
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+version: "`r  sub(pattern='^commit=',replacement='' , grep(commandArgs(trailingOnly=TRUE) , pattern='^commit=', value=TRUE)[[1]] ) `"
+header-includes:
+    - \usepackage{colortbl}
+---
+<!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report.rmd")'
+-->
+```{r setup, include=FALSE}
+library("magrittr")
+library("tidyverse")
+library("rmarkdown")
+library("bookdown")
+library("kableExtra")
+library(splines)
+library(nonnest2)
+library(modelr)
+library(purrr)
+library(pROC)
+knitr::opts_chunk$set(dev = 'pdf')
+hosp_proc <- readRDS("merged_data.RDS" )
+load(file="cognition_cache.rda")
+```
