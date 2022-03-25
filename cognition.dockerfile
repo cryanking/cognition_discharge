@@ -34,7 +34,8 @@ RUN install2.r --error \
     doParallel \
     nonnest2 \
     pROC
-    
+
+RUN install2.r --error kableExtra
      
 # fixes a wierd error
 RUN install2.r --error Rcpp
