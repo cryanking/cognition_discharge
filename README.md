@@ -1,6 +1,22 @@
 # cognition_discharge
 This project is to identify the predictive value of preoperative cognition testing (called AD8 and SBT) for postoperative outcomes, including discharge to other than home, readmission within 30 days, ICU admission, length of stay, and several clinical outcomes. The analysis plan request is found in Analysis plan clinical outcomes 4.26.21 (1).docx
 
+# Process
+- alternative_procedures.R
+- pull_data.sh
+- merging_actdata_to_cog.R 
+
+# Status / TODO
+- updating ICD code sets: done with ICD10, will double check ICD9
+- update covariates to be a little more reasonable
+- rooms file -> ICU admit
+- merge PNA, AKI, stroke, UTI, intubation, arry from ACT2 outcomes
+- Note for SG: reoperation is hard to define, sepsis is not cleanly defined, troponins are not well recorded
+- output all regression data pretty -> doc with sample sizes
+- don't make a forest plot because sample sizes so imbalanced: regression table to appendix
+- peek at epic data
+
+
 Key identifiers for the data are 
 - EMPI (a unique identifier for each patient)
 - PAN (a billing identifier - usually a hospitalization but sometimes longer. PAN should be nested in EMPI)
