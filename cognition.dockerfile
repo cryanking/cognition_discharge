@@ -1,5 +1,5 @@
 FROM rocker/verse:4.1.2
-## tag 1.0 
+## tag cryanking/cognitioncheck:1.1 
 
 ARG R_VERSION
 ARG BUILD_DATE
@@ -29,10 +29,10 @@ RUN  apt-get update \
   
 RUN install2.r --error \
     janitor \
-    table1 \
+    tableone \
     foreach \
     doParallel \
-    glmnet \
+    nonnest2 \
     pROC
     
      
