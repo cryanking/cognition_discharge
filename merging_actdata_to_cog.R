@@ -649,12 +649,13 @@ hosp_proc  %>% analysis_pipe_cv
 #   table1::table1(~Age_at_CPAP + race + male_sex + bmi_cats  + Coronary_artery_disease + low_barthel + Congestive_heart_failure + Atrial_fibrillation_or_flutter_history + CVA + COPD + Asthma + Peripheral_artery_disease + Diabetes_mellitus + Current_cancer+current_heavy+prior_heavy_alcohol+low_functional_capacity+cirrhosis+Dialysis|abn_cog, data=.)
 
 saveRDS(hosp_proc, "merged_data.RDS" )
-save(comborbid_vars ,
-base_form ,
-surg_vars ,
-surg_form ,
-surg_interact_form ,
-comorbid_form ,
-analysis_pipe_vu,
-analysis_pipe_cv
+save( file="cognition_cache.rda" ,
+  comborbid_vars ,
+  base_form ,
+  surg_vars ,
+  surg_form ,
+  surg_interact_form ,
+  comorbid_form ,
+  analysis_pipe_vu,
+  analysis_pipe_cv
 )
