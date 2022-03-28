@@ -15,7 +15,11 @@ This project is to identify the predictive value of preoperative cognition testi
 - output all regression data pretty -> doc with sample sizes
 - don't make a forest plot because sample sizes so imbalanced: regression table to appendix
 - peek at epic data
-
+    - cpap_flows.R pulls AD8, SBT to "/research/ActFast_Intermediates/epic_cpap_flows.csv"
+    - preop_static.R pulls most covariates to "/research/ActFast_Intermediates/epic_preop_before_labs_text_notes.csv
+    - pre_post_flow.R pulls los, readmit, ICU to "/research/ActFast_Intermediates/epic_flo_outcomes.csv"
+    - rearrange.R pulls death from '/research/ActFast_Big/Epic Through 2020_11/Report 2.csv'
+    - ActFastData/ActFast_Big/Epic Through 2020_11/Report 4.csv has procedure codes (by encounter CSN)
 
 Key identifiers for the data are 
 - EMPI (a unique identifier for each patient)

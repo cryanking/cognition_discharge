@@ -30,3 +30,14 @@ knitr::opts_chunk$set(dev = 'pdf')
 hosp_proc <- readRDS("merged_data.RDS" )
 load(file="cognition_cache.rda")
 ```
+
+## Data description
+Data from `r  hosp_proc %>% pull("DoS") %>% min %>% (lubridate::date)` to `r  hosp_proc %>% pull("DoS") %>% max %>% (lubridate::date)` were queried from the MetaVision electronic health record.
+Patients were matched to hospital admission, discharge, billing and mortality data.
+Records were filtered to include those with preoperative clinic visits with AD8 and SBT measured, surgery within 90 days of that clinic visit, and matching billing and discharge records.
+A subset of surgical procedures were included into the analytical dataset, procedure codes for which are in the appendix. This restriction was intended to reduce confounding due to surgical complexity.
+That is, we suspect that patients with impaired cognition may be selectively referred to medical vs surgical management of their conditions, and that patients with impaired cogition will be referred for surgeries with less physiologic stress.
+These procedures were felt to be ones with little variation in overall surgical complexity which would contribute to this selection bias.
+**RKNOTE:** we ought to scan that e.g. big gyn-onc cases aren't included as "hysterectomy" (which they include). I also replaced the "lobectomy" surgery (which is uncommon) with VATS. 
+
+
