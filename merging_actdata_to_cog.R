@@ -80,28 +80,30 @@ Signals %<>% left_join(TextSignals  , by=c("CPAPPatientID"="cpap_patient_id"))
 
 
 ## included procedure lists and categories
-included_proc_codes <- c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")
+# included_proc_codes <- c("0FT44ZZ","0DTN0ZZ", "0DB64Z3", "0FBG0ZZ", "0FBG3ZZ","0UT90ZZ", "0UB74ZZ", "0SG00A0", "0SRC0J9","0SRB04Z","0RRJ00Z","0DQ53ZZ","0FT20ZZ","0TT10ZZ","0VT08ZZ","0TTB0ZZ","B50W","51.23","45.8","43.82","52.7","52.0","68.4","68.5","68.9","68.49","81.06","81.54","81.51","81.80","53.9","32.41","32.49","55.4","60.5","57.71","39.52","39.53")
 
-make_surg_categories <- function(ICD_PROCEDURE_CODE) {
-case_when(
-  ICD_PROCEDURE_CODE == "51.23" | ICD_PROCEDURE_CODE == "0FT44ZZ" ~ 'cholecystectomy', 
-  ICD_PROCEDURE_CODE == "45.8" | ICD_PROCEDURE_CODE == "0DTN0ZZ" ~ 'Colectomy', 
-  ICD_PROCEDURE_CODE == "43.82" | ICD_PROCEDURE_CODE == "0DB64Z3" ~ 'Gastrectomy',
-  ICD_PROCEDURE_CODE == "52.7" | ICD_PROCEDURE_CODE == "0FBG0ZZ" ~ 'whipple',
-  ICD_PROCEDURE_CODE == "68.4" | ICD_PROCEDURE_CODE == "0UT90ZZ" |ICD_PROCEDURE_CODE == "68.5"|ICD_PROCEDURE_CODE =="68.9" ~ 'Hysterectomy',
-  ICD_PROCEDURE_CODE == "68.49" | ICD_PROCEDURE_CODE == "0UB74ZZ" ~ 'Hysterectomy',
-  ICD_PROCEDURE_CODE == "52.0" | ICD_PROCEDURE_CODE ==  "0FBG3ZZ" ~ 'pancreatectomy',
-  ICD_PROCEDURE_CODE == "81.06" | ICD_PROCEDURE_CODE == "0SG00A0" ~ 'lumbarFusion',
-  ICD_PROCEDURE_CODE == "81.54" | ICD_PROCEDURE_CODE == "0SRC0J9" ~ 'totalKneeArthropathy',
-  ICD_PROCEDURE_CODE == "81.51" | ICD_PROCEDURE_CODE == "0SRB04Z" ~ 'totalHip',
-  ICD_PROCEDURE_CODE == "81.80" | ICD_PROCEDURE_CODE == "0RRJ00Z" ~ 'totalShoulder',
-  ICD_PROCEDURE_CODE == "53.9" | ICD_PROCEDURE_CODE ==  "0DQ53ZZ" ~ 'laproscopicHiatalHernia',
-  ICD_PROCEDURE_CODE == "32.49" | ICD_PROCEDURE_CODE == "32.41" ~ 'lobectomy',
-  ICD_PROCEDURE_CODE == "55.4" | ICD_PROCEDURE_CODE == "0TT10ZZ" ~ 'Nephrectomy',
-  ICD_PROCEDURE_CODE == "60.5" | ICD_PROCEDURE_CODE == "0VT08ZZ" ~ 'Prostatectomy',
-  ICD_PROCEDURE_CODE == "57.71" | ICD_PROCEDURE_CODE == "0TTBOZZ" ~ 'Cystectomy',
-  ICD_PROCEDURE_CODE == "39.52" | ICD_PROCEDURE_CODE == "39.53" ~ 'Arteriovenous')
-}
+# make_surg_categories <- function(ICD_PROCEDURE_CODE) {
+# case_when(
+#   ICD_PROCEDURE_CODE == "51.23" | ICD_PROCEDURE_CODE == "0FT44ZZ" ~ 'cholecystectomy', 
+#   ICD_PROCEDURE_CODE == "45.8" | ICD_PROCEDURE_CODE == "0DTN0ZZ" ~ 'Colectomy', 
+#   ICD_PROCEDURE_CODE == "43.82" | ICD_PROCEDURE_CODE == "0DB64Z3" ~ 'Gastrectomy',
+#   ICD_PROCEDURE_CODE == "52.7" | ICD_PROCEDURE_CODE == "0FBG0ZZ" ~ 'whipple',
+#   ICD_PROCEDURE_CODE == "68.4" | ICD_PROCEDURE_CODE == "0UT90ZZ" |ICD_PROCEDURE_CODE == "68.5"|ICD_PROCEDURE_CODE =="68.9" ~ 'Hysterectomy',
+#   ICD_PROCEDURE_CODE == "68.49" | ICD_PROCEDURE_CODE == "0UB74ZZ" ~ 'Hysterectomy',
+#   ICD_PROCEDURE_CODE == "52.0" | ICD_PROCEDURE_CODE ==  "0FBG3ZZ" ~ 'pancreatectomy',
+#   ICD_PROCEDURE_CODE == "81.06" | ICD_PROCEDURE_CODE == "0SG00A0" ~ 'lumbarFusion',
+#   ICD_PROCEDURE_CODE == "81.54" | ICD_PROCEDURE_CODE == "0SRC0J9" ~ 'totalKneeArthropathy',
+#   ICD_PROCEDURE_CODE == "81.51" | ICD_PROCEDURE_CODE == "0SRB04Z" ~ 'totalHip',
+#   ICD_PROCEDURE_CODE == "81.80" | ICD_PROCEDURE_CODE == "0RRJ00Z" ~ 'totalShoulder',
+#   ICD_PROCEDURE_CODE == "53.9" | ICD_PROCEDURE_CODE ==  "0DQ53ZZ" ~ 'laproscopicHiatalHernia',
+#   ICD_PROCEDURE_CODE == "32.49" | ICD_PROCEDURE_CODE == "32.41" ~ 'lobectomy',
+#   ICD_PROCEDURE_CODE == "55.4" | ICD_PROCEDURE_CODE == "0TT10ZZ" ~ 'Nephrectomy',
+#   ICD_PROCEDURE_CODE == "60.5" | ICD_PROCEDURE_CODE == "0VT08ZZ" ~ 'Prostatectomy',
+#   ICD_PROCEDURE_CODE == "57.71" | ICD_PROCEDURE_CODE == "0TTBOZZ" ~ 'Cystectomy',
+#   ICD_PROCEDURE_CODE == "39.52" | ICD_PROCEDURE_CODE == "39.53" ~ 'Arteriovenous')
+# }
+
+
 
 ## categorize some discharge locations
 facility_list <- c(
@@ -194,7 +196,30 @@ CPAP_mapping %>% select(-Data_PatientID, -DoS) %>% distinct %>% left_join(CPAP_m
 
 ## this is the output of alternative_procedures.R, which operates in the ACT2 environment and contains Actfast_proc2, actfast_proc_late, procedure_data are all PAN based linked to Surg_PatientID
 load(file="matched_proc_codes.rdata") 
+all_codes <- unique(c(unique(actfast_proc_late$ICDX_PROCEDURE_CODE) , unique(Actfast_proc2$ICDX_PROCEDURE_CODE)  ) )
 
+code_patterns <- list(
+gut_codes = c("^0D[BTVD5][89ABEFGHKLMNPQ]" , "45\\.[6789]", "^46\\.9[34]", "^48\\.[456]" )
+, stomach_codes = c("^0D[1BVTD5]6" , "^43\\.[56789]")
+, chole_codes = c("^0F[DT]44" , "51\\.2[34]")
+, panc_codes = c("^0F[BT]G", "^52\\.[256]", "52\\.7")
+, hyster_codes = c("^0U[TD][4579]" , "^68\\.[345679]")
+, lumbar_codes = c("^0SG[01]" ,"^81\\.0[678]" , "81\\.3[678]")
+, shoulder_codes = c("^0RR[JK]" , "81\\.8[08]")
+, hiatalHernia_codes = c("^0BU[RST][34]" , "53\\.71")
+, knee_codes =  c("^0S[UR][CD]", "81\\.54")
+, totalHip_codes = c("^0SR[9B]" ,"81\\.51")
+, neph_codes = c( "^0TT[012]", "^55\\.[45]")
+, prost_codes = c("^0VT0" ,"^60\\.[2346]")
+, bladder_codes = c("^0TTB", "^57\\.[67]")
+, ueavfist_codes = c("39\\.42" ,  "39\\.53" , "39\\.27" , "39\\.29" , "^031[345678569ABC]0[A-Z0-9][DF]")
+, vats_codes = c("0BTC4ZZ" , "0BTD4ZZ" , "0BTF4ZZ" , "0BTG4ZZ" , "0BTH4ZZ" , "0BTJ4ZZ" , "0BTK4ZZ" , "0BTL4ZZ" , "32\\.20" , "32\\.24" , "32\\.25" , "32\\.41" )
+)
+observed_codes <- lapply(code_patterns, function(y) unique(unname(unlist(sapply(y, function(x) grep(pattern=x, all_codes, value=T)) )  ) ))
+included_proc_codes <- unlist(observed_codes)
+
+## to avoid ugly loops in R, match procedure codes to the total list of codes [chmatch is an optimized version of match() for characters], then compare that position to the length of the sets
+make_surg_categories <- function(ICD_PROCEDURE_CODE) { data.table::chmatch(ICD_PROCEDURE_CODE, included_proc_codes ) %>% cut( breaks = c(0L,cumsum(sapply(observed_codes, length) ) )) %>% lvls_revalue( c(names(observed_codes) %>% sub(pattern="_codes", replacement="") ) ) }
 
 
 ## for each set, scan the matching procedures within 45 days of the signals eval
@@ -293,13 +318,13 @@ pod4_discharge %<>% mutate( dc_status = case_when(
 other_than_home_pod4<- left_join(signals_procedure, pod4_discharge, by = "CPAPPatientID")
 
 }
-## there are only 6 such cases - just ignore them
+## there are only 47 such cases - just ignore them
 
 
 actfast_proc_filtered %<>%  mutate(SurgeryType = make_surg_categories(ICDX_PROCEDURE_CODE) )
 
-## these surgeries are too uncommon to do anything with
-actfast_proc_filtered %<>% filter(!(SurgeryType %in% c("Gastrectomy" , "laproscopicHiatalHernia" , "Arteriovenous") ) ) 
+# ## these surgeries are too uncommon to do anything with
+# actfast_proc_filtered %<>% filter(!(SurgeryType %in% c("Gastrectomy" , "laproscopicHiatalHernia" , "Arteriovenous") ) ) 
 
 
 ## replace NA with 0 in comorbidities and transform them to binary
@@ -371,7 +396,7 @@ hosp_proc %>% summarize(
 
 #   Abnormal_AD8  NAD8 Abnormal_SBT  NSBT AbnCog NAnyCog
 #          <dbl> <int>        <dbl> <int>  <dbl>   <int>
-# 1       0.0690  2768        0.140  2768  0.184    2768
+# 1       0.0776  5980        0.154  5980  0.201    5980
 
 
 analysis_pipe <- . %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
@@ -454,7 +479,7 @@ readmit_set <- plain_admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE, RE
 
 hosp_proc %<>% mutate( readmit = PAN %in%  unique(readmit_set$PAN_AKA_REG_NO ) )
 
-## only 11%
+## only 12%
 hosp_proc %>%  pull("readmit") %>% table
 
 # length(intersect(hosp_proc$EMPI,  admission_log$REFERENCE_NO ))
@@ -493,11 +518,11 @@ hosp_proc %>% analysis_pipe
 #     2. In-hospital mortality (defined as death prior to discharge from the hospital)
 
 ## LOS
-hosp_proc %<>% left_join(admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE) , by= c("PAN"="PAN_AKA_REG_NO")) %>% mutate(LoS = difftime(DISCHARGE_DATE, Surgery_Date, units="days" )%>% as.numeric )
+hosp_proc %<>% left_join(admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE) , by= c("PAN"="PAN_AKA_REG_NO")) %>% mutate(LoS = difftime(DISCHARGE_DATE, Surgery_Date, units="days" )%>% as.numeric ) %>% mutate(LoS = if_else(LoS<.01, NA_real_, LoS  ))
 
 analysis_pipe <- . %>% filter(dc_status=="home") %>% mutate(thisout=LoS) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
 
-## overall - no association (weakly negative)
+## overall - weak positive association
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) 
@@ -528,7 +553,7 @@ myform <- base_form %>%
   update( "~.+bs(Age_at_CPAP, 3)" ) 
 hosp_proc %>% analysis_pipe
 
-## mortality - only 15
+## mortality - only 38
 mortality_data <- read_csv("metav.csv" , col_types=cols( MPI = col_character(), DATE_OF_DEATH=col_datetime(format="%Y-%m-%d-%H.%M.%S" )   ) )
 
 hosp_proc %<>% left_join( mortality_data , by = c("EMPI" = "MPI") )
@@ -573,7 +598,7 @@ hosp_proc %>% analysis_pipe
 # Analysis 3:
 #     1. Etiology of readmission in patients readmitted with abnormal cognitive screen vs those with a normal preoperative cognitive screen
 
-## with only 42 readmits detectect, I don't think this is worth the effort
+##  I don't have an easy way to do analysis 3 right now
 
 # Analysis 4:
 #     1. Comparative predictive value of AD8 and SBT 
