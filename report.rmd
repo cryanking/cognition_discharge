@@ -50,10 +50,13 @@ Each hospitalization can have procedures qualifying in multiple categories; we c
 Logisitic regression models with the same adjustment startegy were considered for readmission and near-term death.
 A log-link generalized linear model (quasipoisson) with the same set of adjusting variables was used for length of stay.
 
+Heterogeneity of association between abnormal cognition and outcomes was assessed using an expanded model with an interaction term and a score-test. 
+
 
 ## Results
 The filtered dataset included `r hosp_proc %>% pull("EMPI") %>% n_distinct` distinct patients with `r hosp_proc %>% pull("PAN") %>% n_distinct` hospitalizations. 
-Characteristics of the cohort and overall outcome rates are given in Table \@ref(tab:desc)
+Characteristics of the cohort and overall outcome rates are given in Table \@ref(tab:desc).
+AD8 was abnormal (>=2) in `r hosp_proc$AD8 %>% is_greater_than(2) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients; SBT was abnormal (>=5) in `r hosp_proc$SBT %>% is_greater_than(5) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients.
 
 ```{r tableone, echo=FALSE, messages=FALSE, results='asis'}
 factor_vars<- c('sex' , 'race' , 'ASA' , 'low_barthel' , "CAD", "CHF", "AF", "DM" , 'low_functional_capacity', "HTN", "COPD", "CKD" , "CVA",  "readmit_30", "death","dc_home", "Current cancer")
@@ -79,15 +82,17 @@ hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t 
 ```
 
 
-We found that impaired cognition was `r if_else(coef_home[3] < .05,"".  "not ")` significantly associated with discharge to home (odds ratio `r paste0(exp(coef_home[1])%>% round(2), ", 95\\% CI ", ci_home)`, p = `r coef_home[3] %>% format.pval(eps=.001)`  ).
-For readmission in 30 days, impaired cognition was `r if_else(coef_readmit[3] < .05,"".  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_readmit[1])%>% round(2), ", 95\\% CI ", ci_readmit)`, p = `r coef_readmit[3] %>% format.pval(eps=.001)`  ).
-Similarly for near-term death, impaired cognition was `r if_else(coef_death[3] < .05,"".  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_death[1])%>% round(2), ", 95\\% CI ", ci_death)`, p = `r coef_death[3] %>% format.pval(eps=.001)`  ).
-Similarly, impaired cognition was `r if_else(coef_los[3] < .05,"".  "not ")` a significant predictor of length of stay (duration ratio `r paste0(exp(coef_los[1])%>% round(2), ", 95\\% CI ", ci_los)`, p = `r coef_los[3] %>% format.pval(eps=.001)`  ).
+We found that impaired cognition was `r if_else(coef_home[4] < .05,"".  "not ")` significantly associated with discharge to home (odds ratio `r paste0(exp(coef_home[2])%>% round(2), ", 95\\% CI ", ci_home)`, p = `r coef_home[4] %>% format.pval(eps=.001)`  ).
+For readmission in 30 days, impaired cognition was `r if_else(coef_readmit[4] < .05,"".  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_readmit[2])%>% round(2), ", 95\\% CI ", ci_readmit)`, p = `r coef_readmit[3] %>% format.pval(eps=.001)`  ).
+Similarly for near-term death, impaired cognition was `r if_else(coef_death[4] < .05,"".  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_death[2])%>% round(2), ", 95\\% CI ", ci_death)`, p = `r coef_death[4] %>% format.pval(eps=.001)`  ).
+Similarly, impaired cognition was `r if_else(coef_los[4] < .05,"".  "not ")` a significant predictor of length of stay (duration ratio `r paste0(exp(coef_los[3])%>% round(2), ", 95\\% CI ", ci_los)`, p = `r coef_los[4] %>% format.pval(eps=.001)`  ).
 
-We found no evidence of heterogeneity by type of surgery, although power for this question is limited by small sample sizes in some surgery types. A forest plot is presented in
+We found modest evidence of heterogeneity by type of surgery, although power for this question is limited by small sample sizes in some surgery types. A score test comparing models with and without interaction terms yielded a p-value of `r anova(inter_glm, dc_home_glm, test="Rao")  %>% select(starts_with("Pr"))  %>% extract2(2,1) %>% format.pval(eps=.001)`
+A forest plot is presented in Figure \@ref(fig:fig1).
 
-```{r figone, echo=FALSE, messages=FALSE, results='asis'}
+```{r figone, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}"}
 
+include_graphics("forest_home.png")
 ```
 
 

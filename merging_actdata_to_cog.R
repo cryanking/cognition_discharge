@@ -706,7 +706,7 @@ coef_readmit <-  readmit_glm %>% summary %>% extract2("coefficients") %>% as_tib
 
 coef_death <- death_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
-coef_los <- los_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_los <- los_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
 
 ci_pipe <- . %>%  confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% round(2) %>% paste(collapse=" to ")
 
@@ -733,23 +733,36 @@ cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") 
 
 
 
+temp <- dc_home_glm %>% confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
+png(file="forest_home.png", width=5, height=5, units="in", res=300)
+par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
 
-text(x=-5.2, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
+text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 # text(x=-15, y=0, labels="Months", pos=4)
 # text(x=seq(from=0, to=60, by=6), y=0, labels=seq(from=0, to=60, by=6), pos=4)
 abline(v=0)
 abline(h=-.1)
+text(x=-6, y=0.2, labels="Surgery type", pos=4)
+text(x=-3, y=0.2, labels="less dc home", pos=4)
+text(x=-0, y=0.2, labels="more dc home", pos=4)
 
 points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
-arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  )
+arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
 
+text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
+points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
+arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.75)
+axis(1, at=-4, labels="odds-ratio", lwd=0)
+dev.off()
 
 ## todo: add exponential axis, labels, check text position and size, add top label 
-
+anova(inter_glm, dc_home_glm, test="Rao") 
 saveRDS(hosp_proc, "merged_data.RDS" )
 save( file="cognition_cache.rda" ,
+  global_age_spline ,
   dc_home_glm ,
   readmit_glm ,
   death_glm,
