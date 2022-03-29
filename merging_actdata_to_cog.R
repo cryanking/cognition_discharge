@@ -220,7 +220,7 @@ pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hys
 
 pretty_names <- cbind(pretty_names , names(code_patterns) %>% sub(pattern="_codes", replacement="") %>%paste0("SType_", . )  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
-swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType", on="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
+swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
 observed_codes <- lapply(code_patterns, function(y) unique(unname(unlist(sapply(y, function(x) grep(pattern=x, all_codes, value=T)) )  ) ))
 included_proc_codes <- unlist(observed_codes)
@@ -708,7 +708,7 @@ coef_death <- death_glm %>% summary %>% extract2("coefficients") %>% as_tibble(r
 
 coef_los <- los_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
 
-ci_pipe <- . %>%  confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% round(2) %>% paste(collapse=" to ")
+ci_pipe <- . %>%  confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% sprintf(fmt="%.2f") %>% paste(collapse=" to ")
 
 ci_home <- dc_home_glm %>% ci_pipe
 ci_readmit <- readmit_glm %>% ci_pipe
@@ -754,7 +754,7 @@ arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[
 text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
 points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
 arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
-axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.75)
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
 
@@ -767,6 +767,7 @@ save( file="cognition_cache.rda" ,
   readmit_glm ,
   death_glm,
   los_glm,
+  inter_glm, 
   coef_home,
   coef_readmit,
   coef_death,
@@ -781,6 +782,7 @@ save( file="cognition_cache.rda" ,
   surg_form ,
   surg_interact_form ,
   comorbid_form ,
+  pretty_names, 
   analysis_pipe_vu,
   analysis_pipe_cv
 )
