@@ -7,19 +7,15 @@ This project is to identify the predictive value of preoperative cognition testi
 - merging_actdata_to_cog.R 
 
 # Status / TODO
-- updating ICD code sets: done with ICD10, will double check ICD9
-- update covariates to be a little more reasonable
 - rooms file -> ICU admit
 - merge PNA, AKI, stroke, UTI, intubation, arry from ACT2 outcomes
-- Note for SG: reoperation is hard to define, sepsis is not cleanly defined, troponins are not well recorded
-- output all regression data pretty -> doc with sample sizes
-- don't make a forest plot because sample sizes so imbalanced: regression table to appendix
 - peek at epic data
     - cpap_flows.R pulls AD8, SBT to "/research/ActFast_Intermediates/epic_cpap_flows.csv"
     - preop_static.R pulls most covariates to "/research/ActFast_Intermediates/epic_preop_before_labs_text_notes.csv
     - pre_post_flow.R pulls los, readmit, ICU to "/research/ActFast_Intermediates/epic_flo_outcomes.csv"
     - rearrange.R pulls death from '/research/ActFast_Big/Epic Through 2020_11/Report 2.csv'
     - ActFastData/ActFast_Big/Epic Through 2020_11/Report 4.csv has procedure codes (by encounter CSN)
+- the dockerfile has the annoying slowness of having to pull packages, could add a blank report and build
 
 Key identifiers for the data are 
 - EMPI (a unique identifier for each patient)
