@@ -27,17 +27,70 @@ library(modelr)
 library(purrr)
 library(pROC)
 knitr::opts_chunk$set(dev = 'pdf')
-hosp_proc <- readRDS("merged_data.RDS" )
-load(file="cognition_cache.rda")
+hosp_proc <- readRDS("/research/merged_data.RDS" )
+load(file="/research/cognition_cache.rda")
+
+
 ```
 
-## Data description
+## Methods
 Data from `r  hosp_proc %>% pull("DoS") %>% min %>% (lubridate::date)` to `r  hosp_proc %>% pull("DoS") %>% max %>% (lubridate::date)` were queried from the MetaVision electronic health record.
 Patients were matched to hospital admission, discharge, billing and mortality data.
 Records were filtered to include those with preoperative clinic visits with AD8 and SBT measured, surgery within 90 days of that clinic visit, and matching billing and discharge records.
 A subset of surgical procedures were included into the analytical dataset, procedure codes for which are in the appendix. This restriction was intended to reduce confounding due to surgical complexity.
 That is, we suspect that patients with impaired cognition may be selectively referred to medical vs surgical management of their conditions, and that patients with impaired cogition will be referred for surgeries with less physiologic stress.
 These procedures were felt to be ones with little variation in overall surgical complexity which would contribute to this selection bias.
-**RKNOTE:** we ought to scan that e.g. big gyn-onc cases aren't included as "hysterectomy" (which they include). I also replaced the "lobectomy" surgery (which is uncommon) with VATS. 
+**RKNOTE:** we ought to scan that e.g. big gyn-onc cases aren't included as "hysterectomy" (which they include). I also replaced the "lobectomy" surgery (which is uncommon) with VATS. I think it might be a good idea to break the SB/CR and hysterectomy procedures into open vs not.
+
+Because our principal outcomes (readmission, discharge to home) and inclusion critereon (procedure codes) are generated at the hospitalization level, we treat that as the unit of analysis.
+Readmission in 30 days and length of stay was only considered for patients with discharge to home.
+
+Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, stroke or transient ischemic attack, active cancer, and congestive heart failure.  
+Each hospitalization can have procedures qualifying in multiple categories; we created indicator variables for each procedure category and assumed additivity for hospitalizations with more than one type of procedure. 
+Logisitic regression models with the same adjustment startegy were considered for readmission and near-term death.
+A log-link generalized linear model (quasipoisson) with the same set of adjusting variables was used for length of stay.
+
+
+## Results
+The filtered dataset included `r hosp_proc %>% pull("EMPI") %>% n_distinct` distinct patients with `r hosp_proc %>% pull("PAN") %>% n_distinct` hospitalizations. 
+Characteristics of the cohort and overall outcome rates are given in Table \@ref(tab:desc)
+
+```{r tableone, echo=FALSE, messages=FALSE, results='asis'}
+factor_vars<- c('sex' , 'race' , 'ASA' , 'low_barthel' , "CAD", "CHF", "AF", "DM" , 'low_functional_capacity', "HTN", "COPD", "CKD" , "CVA",  "readmit_30", "death","dc_home", "Current cancer")
+con_vars <- c( 'Age' , 'BMI', "LoS")
+hosp_proc %>% rename(Age=Age_at_CPAP, CAD=Coronary_artery_disease, CHF=Congestive_heart_failure, AF=Atrial_fibrillation_or_flutter_history, DM=Diabetes_mellitus CKD=`Chronic kidney disease`, readmit_30=readmit) %>% 
+mutate(low_barthel = Barthel %>% is_less_than(100) %>% as.factor %>% fct_explicit_na ) %>%
+mutate(dc_home=dc_status=="home") %>%
+ CreateTableOne(vars = c(con_vars,factor_vars) , strata = "AbnCog" , data = .   , factorVars = factor_vars,includeNA = FALSE, test=FALSE) -> tab3
+
+ temp <- capture.output(x <- print(tab3 , showAllLevels = TRUE, contDigits=0, printToggle=FALSE, nonnormal=TRUE, exact=T))
+
+
+table_1_format <- kbl(x, longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, ASA = American Society of Anesthesiologists Physical Status, low_barthel = Barthel Index < 100, CHF = Congestive heart failure, AF = Atrial fibrillation or flutter history, DM = Diabetes mellitus, low_functional_capacity = functional capacity estimated < 4 METs, HTN = hypertension, COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA = history of stroke or transient ischemic attack, BMI= body mass index, dc_home = discharge to home, readmit_30 = readmission within 30 days, LoS = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
+kable_styling(latex_options =c("striped") ) 
+# %>% 
+# pack_rows("Baseline Characteristics", 2,7) %>% pack_rows("Outcomes", 8,27)
+
+```
+
+The frequency of each type of surgery is displayed in \@ref(tab:descType). The frequencies do not add up to the number of hospitalizations because of multiple procedures per hospitalization.
+```{r tabletwo, echo=FALSE, messages=FALSE, results='asis'}
+hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="rn") %>% swap_pretty_names %>% set_colnames(c('Surgery Type', 'N')) %>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
+```
+
+
+We found that impaired cognition was `r if_else(coef_home[3] < .05,"".  "not ")` significantly associated with discharge to home (odds ratio `r paste0(exp(coef_home[1])%>% round(2), ", 95\\% CI ", ci_home)`, p = `r coef_home[3] %>% format.pval(eps=.001)`  ).
+For readmission in 30 days, impaired cognition was `r if_else(coef_readmit[3] < .05,"".  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_readmit[1])%>% round(2), ", 95\\% CI ", ci_readmit)`, p = `r coef_readmit[3] %>% format.pval(eps=.001)`  ).
+Similarly for near-term death, impaired cognition was `r if_else(coef_death[3] < .05,"".  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_death[1])%>% round(2), ", 95\\% CI ", ci_death)`, p = `r coef_death[3] %>% format.pval(eps=.001)`  ).
+Similarly, impaired cognition was `r if_else(coef_los[3] < .05,"".  "not ")` a significant predictor of length of stay (duration ratio `r paste0(exp(coef_los[1])%>% round(2), ", 95\\% CI ", ci_los)`, p = `r coef_los[3] %>% format.pval(eps=.001)`  ).
+
+We found no evidence of heterogeneity by type of surgery, although power for this question is limited by small sample sizes in some surgery types. A forest plot is presented in
+
+```{r figone, echo=FALSE, messages=FALSE, results='asis'}
+
+```
+
+
+
 
 

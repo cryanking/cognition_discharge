@@ -215,6 +215,13 @@ gut_codes = c("^0D[BTVD5][89ABEFGHKLMNPQ]" , "45\\.[6789]", "^46\\.9[34]", "^48\
 , ueavfist_codes = c("39\\.42" ,  "39\\.53" , "39\\.27" , "39\\.29" , "^031[345678569ABC]0[A-Z0-9][DF]")
 , vats_codes = c("0BTC4ZZ" , "0BTD4ZZ" , "0BTF4ZZ" , "0BTG4ZZ" , "0BTH4ZZ" , "0BTJ4ZZ" , "0BTK4ZZ" , "0BTL4ZZ" , "32\\.20" , "32\\.24" , "32\\.25" , "32\\.41" )
 )
+
+pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
+
+pretty_names <- cbind(pretty_names , names(code_patterns) %>% sub(pattern="_codes", replacement="") %>%paste0("SType_", . )  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
+
+swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType", on="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
+
 observed_codes <- lapply(code_patterns, function(y) unique(unname(unlist(sapply(y, function(x) grep(pattern=x, all_codes, value=T)) )  ) ))
 included_proc_codes <- unlist(observed_codes)
 
@@ -329,7 +336,8 @@ actfast_proc_filtered %<>%  mutate(SurgeryType = make_surg_categories(ICDX_PROCE
 
 ## replace NA with 0 in comorbidities and transform them to binary
 na_zero <- function(x) {  if_else(is.na(x), 0, x) }
-comborbid_vars <- c("Coronary artery disease", "Congestive heart failure", "Atrial fibrillation or flutter history" , "COPD" , "Asthma" , "Peripheral artery disease" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA" ,"Hypertension")
+# comborbid_vars <- c("Coronary artery disease", "Congestive heart failure", "Atrial fibrillation or flutter history" , "COPD" , "Asthma" , "Peripheral artery disease" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA" ,"Hypertension")
+comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA" )
 
 actfast_proc_filtered %<>%  mutate_at(vars(one_of(comborbid_vars)) , na_zero) %>% mutate_at(vars(one_of(comborbid_vars)) , as.logical) %>% mutate(CVA = `Cerebrovascular disease` | `Cerebrovascular disease, stroke, or TIA` | CVA | TIA) 
 
@@ -436,7 +444,7 @@ hosp_proc %>% analysis_pipe
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 
   
 hosp_proc %>% analysis_pipe
@@ -446,7 +454,7 @@ myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 
 hosp_proc %>% analysis_pipe
 
@@ -456,7 +464,7 @@ myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 
 hosp_proc %>% analysis_pipe
 
@@ -473,7 +481,7 @@ readmit_set <- admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE, REFERENC
 if(FALSE) {
 plain_admission_log <- read_csv("CDS Visits.csv" , col_types=cols( REFERENCE_NO = col_character(), PAN_AKA_REG_NO = col_character(), ADMIT_DATE=col_datetime(format="%Y-%m-%d-%H.%M.%S" ) , DISCHARGE_DATE=col_datetime("%Y-%m-%d-%H.%M.%S"), DISCHARGE_DISPOSITION = col_character()  ) )
 
-readmit_set <- plain_admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE, REFERENCE_NO) %>% left_join(room_transfer %>% select(REFERENCE_NO, ROOM_START_DATE), by=c("REFERENCE_NO"), na_matches="never") %>%  filter( data.table::between(ROOM_START_DATE, DISCHARGE_DATE, DISCHARGE_DATE+lubridate::ddays(0) , NAbounds=NA) ) 
+readmit_set <- plain_admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE, REFERENCE_NO) %>% left_join(room_transfer %>% select(REFERENCE_NO, ROOM_START_DATE), by=c("REFERENCE_NO"), na_matches="never") %>%  filter( data.table::between(ROOM_START_DATE, DISCHARGE_DATE, DISCHARGE_DATE+lubridate::ddays(30) , NAbounds=NA) ) 
 }
 
 
@@ -493,7 +501,7 @@ hosp_proc %>% analysis_pipe
 
 
 ## now adjust for age 
-myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog+ bs(Age_at_CPAP, 3)" ) %>% as.formula
+myform <- paste0( "thisout ~ 0 + ", paste0(surg_vars, collapse=" + "), " + AbnCog+ bs(Age_at_CPAP, 5)" ) %>% as.formula
 hosp_proc %>% analysis_pipe
 
 ## and comorbid
@@ -501,7 +509,7 @@ myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 
 hosp_proc %>% analysis_pipe
 
@@ -532,7 +540,7 @@ hosp_proc  %>% analysis_pipe
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 
 hosp_proc %>% analysis_pipe
 
@@ -541,7 +549,7 @@ myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 hosp_proc %>% analysis_pipe
 
 
@@ -550,7 +558,7 @@ myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 hosp_proc %>% analysis_pipe
 
 ## mortality - only 38
@@ -575,7 +583,7 @@ hosp_proc  %>% analysis_pipe
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 hosp_proc %>% analysis_pipe
 
 ## adjust for comorbid
@@ -583,7 +591,7 @@ myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 hosp_proc %>% analysis_pipe
 
 
@@ -592,7 +600,7 @@ myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
-  update( "~.+bs(Age_at_CPAP, 3)" ) 
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
 hosp_proc %>% analysis_pipe
 
 # Analysis 3:
@@ -673,8 +681,87 @@ hosp_proc  %>% analysis_pipe_cv
 # mutate_at(vars(one_of("Dialysis") ) , na_zero ) %>%
 #   table1::table1(~Age_at_CPAP + race + male_sex + bmi_cats  + Coronary_artery_disease + low_barthel + Congestive_heart_failure + Atrial_fibrillation_or_flutter_history + CVA + COPD + Asthma + Peripheral_artery_disease + Diabetes_mellitus + Current_cancer+current_heavy+prior_heavy_alcohol+low_functional_capacity+cirrhosis+Dialysis|abn_cog, data=.)
 
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
+
+dc_home_glm <- hosp_proc %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+  glm(data=., formula=myform,  family=binomial() ) 
+  
+readmit_glm  <- hosp_proc %>%filter(dc_status=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+  glm(data=., formula=myform,  family=binomial() ) 
+
+death_glm <- hosp_proc %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+  glm(data=., formula=myform,  family=binomial() ) 
+  
+los_glm <- hosp_proc %>%filter %>% filter(dc_status=="home") %>% mutate(thisout=LoS) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() )
+
+
+coef_home <- dc_home_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+coef_readmit <-  readmit_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+coef_death <- death_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+coef_los <- los_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+ci_pipe <- . %>%  confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% round(2) %>% paste(collapse=" to ")
+
+ci_home <- dc_home_glm %>% ci_pipe
+ci_readmit <- readmit_glm %>% ci_pipe
+ci_death <- death_glm %>% ci_pipe
+ci_los <- los_glm %>% ci_pipe
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>% 
+  update( paste0("~.+", surg_interact_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+bs(Age_at_CPAP, 5)" ) 
+  
+
+inter_glm <- hosp_proc %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+  glm(data=., formula=myform,  family=binomial() ) 
+
+point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
+  
+cis_inter <-inter_glm  %>%  confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog"))
+
+cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") ) %>% swap_pretty_names
+
+
+
+
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
+
+text(x=-5.2, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
+# text(x=-15, y=0, labels="Months", pos=4)
+# text(x=seq(from=0, to=60, by=6), y=0, labels=seq(from=0, to=60, by=6), pos=4)
+abline(v=0)
+abline(h=-.1)
+
+points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
+arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  )
+
+
+## todo: add exponential axis, labels, check text position and size, add top label 
+
 saveRDS(hosp_proc, "merged_data.RDS" )
 save( file="cognition_cache.rda" ,
+  dc_home_glm ,
+  readmit_glm ,
+  death_glm,
+  los_glm,
+  coef_home,
+  coef_readmit,
+  coef_death,
+  coef_los,
+  ci_home ,
+  ci_readmit ,
+  ci_death ,
+  ci_los ,
   comborbid_vars ,
   base_form ,
   surg_vars ,
