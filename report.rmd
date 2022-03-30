@@ -65,7 +65,7 @@ All analysis was conducted using R 4.1.2. A repository containing the analysis c
 2. I replaced "lobectomy" (which is uncommon) with VATS. I think it might be a good idea to break the SB/CR and hysterectomy procedures into open vs not.
 3. I do not have an easy way to scan for reason for readmission
 4. Some of the exploratory outcomes are difficult: reoperation is hard to define, sepsis is not cleanly defined, troponins are not well recorded
-5. Some of the exploratory outcomes are not well recorded: PNA, UTI, arrythmia being new
+5. None of the exploratory outcomes are meaningfully associated. I am happy to put that in an appendix.
 
 ## Results
 The filtered dataset included `r hosp_proc %>% pull("EMPI") %>% n_distinct` distinct patients with `r hosp_proc %>% pull("PAN") %>% n_distinct` hospitalizations. 
@@ -74,7 +74,7 @@ AD8 was abnormal (>=2) in `r hosp_proc$AD8 %>% is_greater_than(2) %>% mean(na.rm
 
 ```{r tableone, echo=FALSE, messages=FALSE, results='asis'}
 factor_vars<- c('sex' , 'race' ,  'low_barthel' , "CAD", "CHF", "AF", "DM" , "HTN", "COPD", "CKD" , "CVA",   "Current_cancer", 'low_functional_capacity')
-outcome_factors<- c("dc_home" , "readmit_30", "death" )
+outcome_factors<- c("dc_home" , "readmit_30", "death", "ICU" )
 outcome_con <- "LoS"
 con_vars <- c( 'Age' , 'BMI')
 
@@ -100,7 +100,7 @@ table_1_format
 
 The frequency of each type of surgery is displayed in \@ref(tab:descType). The frequencies do not add up to the number of hospitalizations because of multiple procedures per hospitalization.
 ```{r tabletwo, echo=FALSE, messages=FALSE, results='asis'}
-hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>% set_colnames(c('Surgery Type', 'N')) %>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
+hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>% set_colnames(c('Surgery Type', 'N')) %>% arrange(N) %>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
 ```
 
 

@@ -484,8 +484,11 @@ plain_admission_log <- read_csv("CDS Visits.csv" , col_types=cols( REFERENCE_NO 
 readmit_set <- plain_admission_log %>% select(PAN_AKA_REG_NO, DISCHARGE_DATE, REFERENCE_NO) %>% left_join(room_transfer %>% select(REFERENCE_NO, ROOM_START_DATE), by=c("REFERENCE_NO"), na_matches="never") %>%  filter( data.table::between(ROOM_START_DATE, DISCHARGE_DATE, DISCHARGE_DATE+lubridate::ddays(30) , NAbounds=NA) ) 
 }
 
+## ICU status while I am here
+ICU_set <- room_transfer %>% filter(grepl(WARD, pattern="ICU" ) ) %>% pull("REG_NO") %>% unique
 
-hosp_proc %<>% mutate( readmit = PAN %in%  unique(readmit_set$PAN_AKA_REG_NO ) )
+
+hosp_proc %<>% mutate( readmit = PAN %in%  unique(readmit_set$PAN_AKA_REG_NO ), ICU = PAN %in% ICU_set  )
 
 ## only 12%
 hosp_proc %>%  pull("readmit") %>% table
@@ -731,7 +734,8 @@ cis_inter <-inter_glm  %>%  confint %>% as_tibble(rownames="rname") %>% filter(g
 
 cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") ) %>% swap_pretty_names
 
-
+point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 
 temp <- dc_home_glm %>% confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
@@ -758,8 +762,51 @@ axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1"
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
 
-## todo: add exponential axis, labels, check text position and size, add top label 
 anova(inter_glm, dc_home_glm, test="Rao") 
+
+## exploratory clinical outcomes
+
+clinical_outcomes <- read_csv("outcomes.csv")
+id_links <- read_csv("mv_era_all_ids.csv", col_types=cols(PatientID=col_character(), DoS = col_datetime(),  DoB = col_datetime() , EMPI = col_character(), IDCode= col_character(), VisitIDCode = col_character(),AnestStop = col_datetime()  ))
+clinical_outcomes %<>% inner_join(id_links, by="caseid", na_matches="never" ) %>% select(VisitIDCode, icu_status, Stroke, AKI_v2, AbnormalHeartRythmn, DoS )
+
+hosp_proc %<>% left_join(clinical_outcomes , by=c("PAN"="VisitIDCode" ) , na_matches="never" ) %>% group_by(PAN) %>% slice_min(order_by=DoS.y, n=1, with_ties=FALSE) %>% ungroup %>% rename(DoS=DoS.x) 
+
+hosp_proc$icu_status  %>% table(useNA='a')
+hosp_proc$Stroke  %>% table(useNA='a')
+# hosp_proc$Pneumonia  %>% table(useNA='a')
+hosp_proc$AbnormalHeartRythmn  %>% table(useNA='a')
+hosp_proc$AKI_v2  %>% table(useNA='a')
+# hosp_proc$ARF  %>% table(useNA='a')
+# hosp_proc$SurgicalWoundInfection  %>% table(useNA='a')
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
+
+## ICU admission
+analysis_pipe <- . %>% mutate(thisout=icu_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+hosp_proc %>% analysis_pipe
+
+## AKI
+analysis_pipe <- . %>% mutate(thisout=AKI_v2) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+hosp_proc %>% analysis_pipe
+
+## arrythmia
+analysis_pipe <- . %>% mutate(thisout=AbnormalHeartRythmn) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+hosp_proc %>% analysis_pipe
+
+## stroke
+analysis_pipe <- . %>% mutate(thisout=Stroke) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+
+hosp_proc %>% analysis_pipe
+
+
 saveRDS(hosp_proc, "merged_data.RDS" )
 save( file="cognition_cache.rda" ,
   global_age_spline ,
@@ -786,3 +833,8 @@ save( file="cognition_cache.rda" ,
   analysis_pipe_vu,
   analysis_pipe_cv
 )
+
+
+
+
+

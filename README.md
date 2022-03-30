@@ -7,8 +7,6 @@ This project is to identify the predictive value of preoperative cognition testi
 - merging_actdata_to_cog.R 
 
 # Status / TODO
-- rooms file -> ICU admit
-- merge PNA, AKI, stroke, UTI, intubation, arry from ACT2 outcomes
 - peek at epic data
     - cpap_flows.R pulls AD8, SBT to "/research/ActFast_Intermediates/epic_cpap_flows.csv"
     - preop_static.R pulls most covariates to "/research/ActFast_Intermediates/epic_preop_before_labs_text_notes.csv
