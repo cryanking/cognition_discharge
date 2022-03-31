@@ -152,6 +152,9 @@ dispo_holder[[ts_index]] <- epic_flow_1[MEASURE_NAME %chin% c("DISCHARGE TO" , "
 }
 
 dispo_holder %<>% rbindlist
+
+dispo_holder %>% saveRDS("/research/ActFast_Intermediates/dispo_status.rda")
+
 ## annoying links 
 my_visits <- epic_admits[ADT_EVENT %chin% c("Admission","Discharge" , "Hospital Outpatient") , .(CurrentMRN = first(CurrentMRN), admt = min(EFFECTIVE_TIME), dist=max(EFFECTIVE_TIME) ) , by="CSN"]
 # my_visits[ , LoS := as.numeric(difftime(dist, admt, units="days") ) ]
