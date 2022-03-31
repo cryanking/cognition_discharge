@@ -5,16 +5,22 @@ library(lubridate)
 library(magrittr)
 clarity_root <- '/research/ActFast_Epic_Flow/Data 202004/Clarity data/'
 
-## AD8, SBT
+## AD8, SBT pre-processed in main actfast
 processed_preop_screen <- fread("/research/ActFast_Intermediates/epic_cpap_flows.csv")
+
+## demographics and comorbidities pre-processed in main actfast
 preop_covariates <- fread("/research/ActFast_Intermediates/epic_preop_before_labs_text_notes.csv")
-## ICU status, length of stay, readmission
+
+## ICU status, length of stay, readmission, pre-processed in main actfast
 admit_outcomes <- fread("/research/ActFast_Intermediates/epic_flo_outcomes.csv")
-death_outcomes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 2.csv')
+
 ## death is just MRN +  date, need to make survival something relative to surgeries; preop file has already merged orlogid (surgery events) to MRN
+death_outcomes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 2.csv')
 preop_covariates <- merge(death_outcomes, preop_covariates, by.y="CurrentMRN", by.x="Patient Primary MRN", all.y=T)
+
 procedure_codes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 4.csv', sep=";" )
 
+## admission data to get discharge times
 epic_admits <- fread(paste0(clarity_root , 'Clarity Hogue Result Set ADT.csv'))
 my_visits <- epic_admits[ADT_EVENT %chin% c("Admission","Discharge" , "Hospital Outpatient") , .(CurrentMRN = first(CurrentMRN), admt = min(EFFECTIVE_TIME), dist=max(EFFECTIVE_TIME) ) , by="CSN"]
 
@@ -29,37 +35,7 @@ merged_data <- merged_data[ !is.na(AD8) ][!is.na(SBT)]
 merged_data[ , AbnCog := as.numeric(SBT) >= 5 | as.numeric(AD8) >= 2 ]
 merged_data <- merged_data[age>=64.5]
 
-# -- need LoS
-# -- need discharge to
-
-## 'Clarity Harper Result Set Anesthesia Identifiers.csv' grabs the most matches (still less than 1/3 of the total N)
-if(FALSE) {
-other_ids <- fread("/research/Actfast_reident_epic/epic_orlogid_codes.csv"  )
-epic_id1<-  fread(paste0(clarity_root , 'Clarity MRN CSN INP Combined.csv') )
-epic_id2<-  fread(paste0(clarity_root , 'Clarity Harper Result Set Anesthesia Identifiers.csv') )
-epic_id2 <- epic_id2 [AN_3_ENC_CSN_ID != "NULL"]
-
-epic_id2[, MAR_WINDOW_END := lubridate::ymd_hms(MAR_WINDOW_END)]
-epic_id2 <- epic_id2[!is.na(MAR_WINDOW_END)]
-
-
-num_overlap <- function(x, y) {
-  output <- matrix(NA, nrow=ncol(x), ncol=ncol(y))
-  rownames(output ) <- colnames(x)
-  colnames(output)  <- colnames(y)
-  for( i in seq(ncol(x))) {
-    for( j in seq(ncol(y))) {
-      output[i,j] <- intersect(as.character(x[[i]]), as.character(y[[j]])) %>% length
-    }
-  }
-  return(output)
-}
-
-num_overlap(epic_id1, procedure_codes[, .(`Encounter Epic CSN`)])
-num_overlap(epic_id2, procedure_codes[, .(`Encounter Epic CSN`)])
-}
-
-## this ID set is needed to merge the procedure codes
+## this ID mapping file is needed to merge the procedure codes
 epic_id2<-  fread(paste0(clarity_root , 'Clarity Harper Result Set Anesthesia Identifiers.csv') )
 epic_id2 <- epic_id2 [AN_3_ENC_CSN_ID != "NULL"]
 epic_id2[, MAR_WINDOW_END := lubridate::ymd_hms(MAR_WINDOW_END)]
@@ -71,14 +47,6 @@ procedure_codes <- epic_id2[ , .(orlogid=LOG_ID, CSN=AN_3_ENC_CSN_ID, AN_PROC_NA
 ## there are some hospitalizations with no billing
 procedure_codes <- procedure_codes[codes != ""]
 
-if(FALSE) {
-procedure_codes_reduced <- procedure_codes[orlogid %in% merged_data$orlogid ] 
-sum(( procedure_codes_reduced$codes %>% strsplit( split=",", fixed=T) %>% unlist %>% unname ) %chin% observed_codes[["ueavfist_codes"]][1:25] )
-
-procedure_codes_reduced
-procedure_codes_reduced[ grepl(AN_PROC_NAME, pattern="ARTERIOVENOUS", ignore.case=T) ]
-
-}
 
 code_patterns <- list(
 gut_codes = c("0D[BTVD5][89ABEFGHKLMNPQ]"  )
@@ -98,6 +66,14 @@ gut_codes = c("0D[BTVD5][89ABEFGHKLMNPQ]"  )
 , vats_codes = c("0BT[CDFGHJK]4ZZ")
 )
 
+## testing
+if(FALSE) {
+procedure_codes_reduced <- procedure_codes[orlogid %in% merged_data$orlogid ] 
+sum(( procedure_codes_reduced$codes %>% strsplit( split=",", fixed=T) %>% unlist %>% unname ) %chin% observed_codes[["ueavfist_codes"]][1:25] )
+
+procedure_codes_reduced
+procedure_codes_reduced[ grepl(AN_PROC_NAME, pattern="ARTERIOVENOUS", ignore.case=T) ]
+}
 
 
 ## DONE: (1) modify this to iterate over arrays, as done for mv (2) add more cpt codes
@@ -111,12 +87,11 @@ all_codes <- procedure_codes$codes %>% strsplit( split=",", fixed=T)
 ## save a little time by doing this once
 unique_codes <- all_codes %>% unlist %>% unname %>% unique
 
-
+## per-procedure set list of codes that actually occur
 observed_codes <- lapply(code_patterns, function(y) unique(unname(unlist(sapply(y, function(x) grep(pattern=paste0("^", x),unique_codes , value=T)) )  ) ))
 
 ## transform a code into the set it belongs to; this requires the assumption that a a specific code doese not overlap into multiple sets
 code_categories <- chmatch(all_codes %>% unlist %>% unname , observed_codes %>% unlist ) %>% cut( breaks = c(0L,cumsum(sapply(observed_codes, length) ) )) %>% forcats::lvls_revalue( c(names(observed_codes) ) )
-#%>% sub(pattern="_codes", replacement="")
 
 na_false <- function(x) fifelse(is.na(x), FALSE, x )
 for( thisset in names(code_patterns) ) {
@@ -175,7 +150,7 @@ dispo_holder[[ts_index]] <- epic_flow_1[MEASURE_NAME %chin% c("DISCHARGE TO" , "
 dispo_holder %<>% rbindlist
 dispo_holder %>% saveRDS("/research/ActFast_Intermediates/dispo_status.rda")
 
-## scanning flow take a long time, so make a copy
+## scanning flow take a long time (IO bound), so make a copy
 dispo_holder2 <- dispo_holder[!(VALUE %chin% c("Nursing Unit", "Other (Comment)") ) ][!is.na(VALUE)]
 
 dispo_holder2[, dispo_type := fcase(
@@ -225,7 +200,7 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 #      bladder_codes     ueavfist_codes         vats_codes 
 #                 52                  8                 41 
 
-## TODO: i must be missing av fistulas somehow
+## TODO: I don't know why some groups are so much smaller than expected. Maybe has to do with how the procedure set was queried. It may be set up to get inpatient only.
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
