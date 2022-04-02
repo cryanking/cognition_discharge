@@ -41,11 +41,36 @@ epic_id2 <- epic_id2 [AN_3_ENC_CSN_ID != "NULL"]
 epic_id2[, MAR_WINDOW_END := lubridate::ymd_hms(MAR_WINDOW_END)]
 epic_id2 <- epic_id2[!is.na(MAR_WINDOW_END)]
 
-procedure_codes <- epic_id2[ , .(orlogid=LOG_ID, CSN=AN_3_ENC_CSN_ID, AN_PROC_NAME, AN_DATE)][procedure_codes[, .(CSN=`Encounter Epic CSN` %>% as.character, codes=`Procedure Code Concat (1-50)`) ]  , on="CSN"]
+procedure_codes <- epic_id2[ , .(orlogid=LOG_ID, CSN=AN_3_ENC_CSN_ID, AN_PROC_NAME, AN_DATE)][procedure_codes[, .(CSN=`Encounter Epic CSN` %>% as.character, codes=`Procedure Code Concat (1-50)`, dist=`Discharge Date`, admt=`Admit Date`, dispo=`Discharge Disposition`) ]  , on="CSN"]
+
+procedure_codes[, dispo:= fcase(dispo,
+  "RTN" , "home", ## home or self care
+  "ORH" , "facility", ## inpatient rehab
+  "HHC" , "home", ## with home health
+  "SNF", "facility",
+  "ICF", "facility", ## custodial facility = ward of state?
+  "HSM", "death", ## hospice
+  "SWG", "facility", ## swing bed = SNF/ inpt hybrid
+  "EXP", "death", 
+  "AMA", "home",
+  "COL", "home", ## jail
+  "OIN", "facility", ## transfer to cancer center
+  "LTC", "facility",
+  "HOS", "death", ## hospice
+  "LWB", "home", ## also AMA
+  "FED", "facility", ## VA
+  "PSY", "facility", 
+  "DRR", "facility", ## transfer, maybe make NA?
+  "LRP", NA_character_ ## diverted elsewhere - these are probably errors
+  "OTH", "facility", ## transfer / inpatient rehab
+  "DBR", NA_character_, ## I think an error code
+  "NSF", "facility", ## SNF also
+  default=NA_character_) ]
 
 ## unfortunately, the codes are a comma separated column
 ## there are some hospitalizations with no billing
 procedure_codes <- procedure_codes[codes != ""]
+procedure_codes <- procedure_codes[! is.na(dispo)]
 
 
 code_patterns <- list(
@@ -122,8 +147,15 @@ procedure_codes <- procedure_codes[included==TRUE]
 
 
 
-merged_data <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes) ] , by="orlogid")
+merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes) ] , by="orlogid")
 
+# merged_data2 <- merged_data %>% merge(dispo_holder2, by.x="orlogid", by.y="LOG_ID")
+
+merged_data2[ , dc_home := dispo=="home"]
+
+
+## old way of doing things, pulling discharges from nursing documents
+if(FALSE) {
 ## discharge events that show up in nursing / case management flowsheets. surprisingly complete.
 ## TODO: scan if missing patients are mostly "outpatient" and probably don't have this class if never admitted
 all_ts <- list.files(clarity_root , full.names=TRUE, pattern="Clarity\\sHogue\\sResult\\sSet\\sFlowsheets\\s\\d")
@@ -185,6 +217,7 @@ dispo_holder2 <- dispo_holder2[ , .(dispo_type = min(dispo_type_num ), dist= max
 merged_data2 <- merged_data %>% merge(dispo_holder2, by.x="orlogid", by.y="LOG_ID")
 
 merged_data2[ , dc_home := dispo_type==3]
+}
 
 ## fixing up the death events as promised above
 merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < dist + ddays(30), TRUE, default=FALSE) ]
