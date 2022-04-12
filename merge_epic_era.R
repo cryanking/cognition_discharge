@@ -347,6 +347,7 @@ surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
 comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
 
 ## TODO return here: no-intercept model isn't working even with adding sum(codes) [no-intercept implies reference = everyone else]
+## import brglm2 and use method = "brglmFit" in glm
 
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
@@ -357,7 +358,7 @@ library(dplyr)
 library(splines)
 ## surgery effects
 
-analysis_pipe <- . %>% mutate(thisout=dc_home) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+analysis_pipe <- . %>% mutate(thisout=dc_home) %>% mutate(across(contains("_codes"), as.numeric)) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) %>% 
   summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="_codes")) %>% select(-`z value`)
 
@@ -365,7 +366,7 @@ merged_data2 %>% analysis_pipe
 
 
 
-analysis_pipe <- . %>% mutate(thisout=dc_home) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes"), as.numeric)) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) %>% 
   summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
