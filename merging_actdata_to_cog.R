@@ -11,6 +11,16 @@ library(modelr)
 library(purrr)
 library(pROC)
 
+## "Figure 1" data
+##  -- all surgeries > 65 
+##  -- distinct hospitalizations w / qualifying procedures
+##  -- eval w/i 90 days
+##  -- cog data present
+##  -- admission data present -> 100%
+
+
+figure1 <- data.frame(Stage=NULL, N=NULL, deltaN=NULL)
+
 setwd("/research")
 ## NOTE: this does NOT work for readmission timing / length of stay because this file does not contain discharge times!
 ## it does contain ED visits and I think readmits
@@ -162,9 +172,7 @@ death_list <- all_dc_locations %>% grep( pattern="expired", ignore.case=T, value
 # setdiff(all_dc_locations , c(home_list, facility_list, death_list) )
 
 
-## age filter is a non-op, but many don't have AD8 or ABT
-Signals %<>% filter(Age_at_CPAP >= 65)   %>%  filter(!(is.na(AD8) & is.na(SBT) ) )
-  
+
 ## cross-walk CPAP patient IDs to surgery patient IDs
 CPAP_mapping<- read_csv( file="CPAP_to_surg.csv", col_types="cccccT"  )
 
@@ -231,11 +239,17 @@ make_surg_categories <- function(ICD_PROCEDURE_CODE) { data.table::chmatch(ICD_P
 
 ## for each set, scan the matching procedures within 45 days of the signals eval
 
+## candidates for figure 1 "surgeries age > 65"
+figure1 <- data.frame(Stage="surgeries age > 65", N=Signals %>% nrow, deltaN=NA_real_)
+
+## age filter is a non-op, but many don't have AD8 or ABT
+# Signals %<>% filter(Age_at_CPAP >= 65)   %>%  filter(!(is.na(AD8) & is.na(SBT) ) )
+  
 ######## oldest (CLORE) procedure data
 ## 585 within 90 days
 actfast_proc_late_filtered <- actfast_proc_late  %>% filter( ICDX_PROCEDURE_CODE %in% included_proc_codes) %>% select(PatientID, ICDX_PROCEDURE_CODE) %>% inner_join(rematched_data, by =  c("PatientID" = "Surg_PatientID" ), na_matches = "never")
 actfast_proc_late_filtered %<>% inner_join(Signals, by =  c("Data_PatientID"   = "CPAPPatientID"), na_matches = "never")
-actfast_proc_late_filtered %<>% filter(CPAP_Date > AnestStart - lubridate::ddays(90))
+
 # actfast_proc_late_filtered$PatientID %>% n_distinct
 
 ## other "half" of the data set: 2577 so total 3162
@@ -251,12 +265,29 @@ actfast_proc_early_filtered$Surg_PatientID %>% unique -> temp ##setdiff vs below
 
 actfast_proc_early_filtered <- Actfast_proc2 %>% filter( ICDX_PROCEDURE_CODE %in% included_proc_codes) %>% select(PatientID, ICDX_PROCEDURE_CODE) %>% inner_join(CPAP_mapping, by =  c("PatientID" = "Surg_PatientID" ), na_matches = "never")
 actfast_proc_early_filtered %<>% inner_join(Signals, by =  c("Data_PatientID"   = "CPAPPatientID"), na_matches = "never")
-actfast_proc_early_filtered %<>% filter(CPAP_Date > AnestStart - lubridate::ddays(90))
-actfast_proc_early_filtered %<>% filter( difftime(CPAP_Date, DoS, units="days") %>% as.numeric %>% abs %>% is_less_than(1) )
+
+
 
 ## there are a negligible number of failed PANs, just delete them
 actfast_proc_early_filtered %<>% filter(!is.na(PAN))
 actfast_proc_late_filtered %<>% filter(!is.na(PAN))
+
+actfast_proc_filtered <- bind_rows(actfast_proc_late_filtered,actfast_proc_early_filtered)
+
+figure1 <- bind_rows(figure1 , data.frame(Stage="distinct hospitalizations w / qualifying procedures", N=actfast_proc_filtered$PAN %>% n_distinct, deltaN=NA_real_) )
+
+
+actfast_proc_filtered %<>% filter(CPAP_Date > AnestStart - lubridate::ddays(90))
+
+actfast_proc_filtered %<>% filter( difftime(CPAP_Date, DoS, units="days") %>% as.numeric %>% abs %>% is_less_than(1) )
+
+figure1 <- bind_rows(figure1 , data.frame(Stage="preop eval w/i 90 days", N=actfast_proc_filtered$PAN %>% n_distinct, deltaN=NA_real_) )
+
+actfast_proc_filtered %<>% filter( is.na(AD8) + is.na(SBT) < 2)
+
+figure1 <- bind_rows(figure1 , data.frame(Stage="cognitive screen present", N=actfast_proc_filtered$PAN %>% n_distinct, deltaN=NA_real_) )
+
+
 
 ######## newer (ACT3) data -> 1811 cases
 ## not used, this set is smaller because it did not include patients who were not eligible for ACT3 by virtue of the tower not being staffed
@@ -279,10 +310,7 @@ if(FALSE) {
 
 
 # setequal(actfast_proc_late_filtered %>% colnames,  actfast_proc_early_filtered %>% colnames) # TRUE
-actfast_proc_filtered <- bind_rows(actfast_proc_late_filtered,actfast_proc_early_filtered)
-## 3145 PatientID
-## coalesce to require at least one measurement of both traits in a window
-actfast_proc_filtered %<>%  group_by(PatientID) %>% mutate( anymiss=all(is.na(AD8)) | all(is.na(SBT)) ) %>% ungroup %>% filter(anymiss==FALSE) %>% select(-anymiss)
+# actfast_proc_filtered %<>%  group_by(PatientID) %>% mutate( anymiss=all(is.na(AD8)) | all(is.na(SBT)) ) %>% ungroup %>% filter(anymiss==FALSE) %>% select(-anymiss)
 actfast_proc_filtered %<>% group_by(PatientID) %>% arrange(DoS) %>% mutate(AD8= AD8 %>% na.omit %>% last, SBT=SBT%>% na.omit %>% last ) %>% slice_tail(n=1) %>% ungroup
 
 # ## old way of doing slice instead of coalesce, only matters a few times
@@ -360,6 +388,7 @@ encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
   colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
   encoded_data
 }
+
 actfast_proc_filtered <- bind_cols(actfast_proc_filtered, encode_onehot(actfast_proc_filtered$SurgeryType, colname_prefix="SType_") %>% as_tibble )
 
 hosp_proc<- actfast_proc_filtered  %>% group_by(PAN) %>% mutate_at(vars(one_of("Age_at_CPAP"),starts_with("SType_") ), max)  %>%  slice_head( n=1 ) %>% ungroup
@@ -407,7 +436,9 @@ hosp_proc %>% summarize(
 # 1       0.0776  5980        0.154  5980  0.201    5980
 
 
-analysis_pipe <- . %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+# hosp_proc %>% filter(!is.na(dc_status)) %>% summarize(n_distinct(PAN))
+
+analysis_pipe <- . %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) %>% 
   summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
@@ -430,7 +461,7 @@ hosp_proc %>% analysis_pipe
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) )
 
-hosp_proc %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=.,  formula=myform,
+hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=.,  formula=myform,
       , family=binomial()   ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(!grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
 ## overall
@@ -617,14 +648,14 @@ hosp_proc %>% analysis_pipe
 # there are two common ways to compare non-nested models for predictive value: vuong / clarke type tests and hold out samples
 
 analysis_pipe_vu <- function(x) {
-g1 <- x %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
-g2 <- x %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g1 <- x %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g2 <- x %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
 vuongtest(g1, g2)
 }
 
 analysis_pipe_cv <- function(x) {
 
-  x2 <- x %>% mutate(thisout=dc_status=="home")
+  x2 <- x %>% mutate(thisout=dc_status!="home")
     ## produce a shared set of cross-validation folds - note that dplyr / magrittr do not automatically know how to turn the fold-by-ref into a dataframe for manipulation, but they seems to have added a glm method
   rs <- crossv_kfold(x2, k=100)
   ## train the first model on all folds, then evaluate it on the hold out data using AUROC as a critereon - note the wrapper since at low frequency / sample size an evaluation set can have no events
@@ -691,7 +722,7 @@ myform <- base_form %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+bs(Age_at_CPAP, 5)" ) 
 
-dc_home_glm <- hosp_proc %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+dc_home_glm <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) 
   
 readmit_glm  <- hosp_proc %>%filter(dc_status=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
@@ -725,7 +756,7 @@ myform <- base_form %>%
   update( "~.+bs(Age_at_CPAP, 5)" ) 
   
 
-inter_glm <- hosp_proc %>% mutate(thisout=dc_status=="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+inter_glm <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) 
 
 point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
@@ -809,6 +840,7 @@ hosp_proc %>% analysis_pipe
 
 saveRDS(hosp_proc, "merged_data.RDS" )
 save( file="cognition_cache.rda" ,
+  figure1,
   global_age_spline ,
   dc_home_glm ,
   readmit_glm ,
