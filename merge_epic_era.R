@@ -93,6 +93,7 @@ cog_dates <- preop_covariates[ ,.(MRN=`Patient Primary MRN`, orlogid, AnestStart
 
 cog_dates <- cog_dates[MEASURE_NAME %chin% c("Short Blessed Total Score" , "AD8 Dementia Score") , .(cogdate=last(Recorded_Time)) ,  by="orlogid"]
 
+
 ## filter to just the variables of interest
 merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
 merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>%
@@ -164,6 +165,43 @@ pattern_names <- data.table(code_names = names(code_patterns), Group= c(2,3,1,4,
 cpt_codes <- pattern_names[cpt_codes ,on="Group"]
 
 
+
+## add in CPT codes from AMO
+cpt_code_pattern <- readxl::read_xlsx("/research/ActFast_BJ_Data/External_Dictionaries/CPT codes.xlsx")
+cpt_code_pattern <- cpt_code_pattern[is.na(cpt_code_pattern$drop),]
+
+code_patterns$gut_codes <- c(code_patterns$gut_codes, cpt_code_pattern[cpt_code_pattern$group==2 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$stomach_codes <- c(code_patterns$stomach_codes, cpt_code_pattern[cpt_code_pattern$group==3 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$chole_codes <- c(code_patterns$chole_codes, cpt_code_pattern[cpt_code_pattern$group==1 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$panc_codes <- c(code_patterns$panc_codes, cpt_code_pattern[cpt_code_pattern$group==4 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$hyster_codes <- c(code_patterns$hyster_codes, cpt_code_pattern[cpt_code_pattern$group==5 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$lumbar_codes <- c(code_patterns$lumbar_codes, cpt_code_pattern[cpt_code_pattern$group==6 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$shoulder_codes <- c(code_patterns$shoulder_codes, cpt_code_pattern[cpt_code_pattern$group==9 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$hiatalHernia_codes <- c(code_patterns$hiatalHernia_codes, cpt_code_pattern[cpt_code_pattern$group==10 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$knee_codes <- c(code_patterns$knee_codes, cpt_code_pattern[cpt_code_pattern$group==7 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$totalHip_codes <- c(code_patterns$totalHip_codes, cpt_code_pattern[cpt_code_pattern$group==8 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$neph_codes <- c(code_patterns$neph_codes, cpt_code_pattern[cpt_code_pattern$group==12 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$prost_codes <- c(code_patterns$prost_codes, cpt_code_pattern[cpt_code_pattern$group==13 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$bladder_codes <- c(code_patterns$bladder_codes, cpt_code_pattern[cpt_code_pattern$group==14 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$ueavfist_codes <- c(code_patterns$ueavfist_codes, cpt_code_pattern[cpt_code_pattern$group==15 , "code", drop=TRUE] ) %>% unique
+
+code_patterns$vats_codes <- c(code_patterns$vats_codes, cpt_code_pattern[cpt_code_pattern$group==11 , "code", drop=TRUE] ) %>% unique
+
+
+
 ## testing
 if(FALSE) {
 procedure_codes_reduced <- procedure_codes[orlogid %in% merged_data$orlogid ] 
@@ -230,13 +268,13 @@ if(FALSE) {
 
 }
 
-procedure_codes <- procedure_codes[included==TRUE]
 
 figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(intersect(procedure_codes$orlogid , merged_data$orlogid ) ), deltaN=NA_real_) )
 
 
 merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
 
+<<<<<<< HEAD
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
@@ -259,8 +297,63 @@ merged_data2[ , AbnCog := fcase(
   is.na(SBT) , AD8>=2 ,
   !(is.na(SBT) | is.na(SBT)), AD8>=2 | SBT>=5 ) ]
   
+=======
+if(FALSE) {
+## an aside -- figure 1 type flow
+## only 16 k hae an AD8+SBT, 30k one or the other
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] [ !is.na(AD8) | !is.na(SBT)]$orlogid %>% uniqueN
 
-# merged_data2 <- merged_data %>% merge(dispo_holder2, by.x="orlogid", by.y="LOG_ID")
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] [ !is.na(AD8) ][!is.na(SBT)]$orlogid %>% uniqueN
+
+## these don't do anything
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
+merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% pull("orlogid") %>% uniqueN
+
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
+merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
+
+## 33k age >= 65
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
+merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
+
+## only 16 k have an AD8+SBT, 30k one or the other
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ][ !is.na(AD8) ][!is.na(SBT)] %>% 
+merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
+
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ][ !is.na(AD8) | !is.na(SBT)] %>% 
+merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
+
+## only 13k matching procedures, some procedures like avf are just uncommon in this data
+## supported by manually scanning for text
+
+## 40k procedure code data present
+procedure_codes$CSN %>% uniqueN
+
+## 15k age > 65
+procedure_codes[preop_covariates[age >= 65], on="orlogid"]$CSN %>% uniqueN
+
+## 4.8k included
+procedure_codes[preop_covariates[age >= 65], on="orlogid"][included==TRUE, CSN] %>% uniqueN
+
+procedure_codes[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum)
+#          gut_codes      stomach_codes        chole_codes         panc_codes 
+#               3764               1213                609                556 
+#       hyster_codes       lumbar_codes     shoulder_codes hiatalHernia_codes 
+#               2343               1332               1205                183 
+#         knee_codes     totalHip_codes         neph_codes        prost_codes 
+#               1393               1432                692                823 
+#      bladder_codes     ueavfist_codes         vats_codes 
+#                206                267                162 
+
+## with ad8+sbt 3716
+
+processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ][ !is.na(AD8) ][!is.na(SBT)] %>% 
+merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% merge(procedure_codes[included==TRUE, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid") %>% pull("orlogid") %>% uniqueN
+
+}
+
+
+
 
 merged_data2[ , dc_home := dispo!="home"]
 my_visits<- my_visits[ preop_covariates[ ,.(CurrentMRN=`Patient Primary MRN`, orlogid, AnestStop)] , allow.cartesian=TRUE, nomatch=NULL, on="CurrentMRN"]
@@ -345,6 +438,9 @@ merged_data2[ , dc_home := dispo_type==3]
 }
 
 ## fixing up the death events as promised above
+merged_data2[, CSN:=as.character(CSN)]
+my_visits[, CSN:=as.character(CSN)]
+merged_data2 <- merge(merged_data2, my_visits, by="CSN", all.x=TRUE, all.y=FALSE)
 merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < dist + ddays(30), TRUE, default=FALSE) ]
 
 merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum) -> code_counts
@@ -360,6 +456,7 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 
 
 
+
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
@@ -369,13 +466,14 @@ comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatu
 
 ## surgery specific effects - build formulas externally because of the non-factor structure
 ## save these building blocks for various models
-base_form <- "thisout ~ 0" %>% formula
+base_form <- "thisout ~ 1" %>% formula
 surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
 surg_form <- paste0(surg_vars, collapse=" + ")
 surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
 comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
 
-
+## TODO return here: no-intercept model isn't working even with adding sum(codes) [no-intercept implies reference = everyone else]
+## import brglm2 and use method = "brglmFit" in glm
 
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
@@ -384,7 +482,17 @@ myform <- base_form %>%
 
 library(dplyr)  
 library(splines)
-analysis_pipe <- . %>% mutate(thisout=dc_home) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+## surgery effects
+
+analysis_pipe <- . %>% mutate(thisout=dc_home) %>% mutate(across(contains("_codes"), as.numeric)) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
+  glm(data=., formula=myform,  family=binomial() ) %>% 
+  summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="_codes")) %>% select(-`z value`)
+
+merged_data2 %>% analysis_pipe
+
+
+
+analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes"), as.numeric)) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) %>% 
   summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
 
@@ -396,6 +504,4 @@ myform <- base_form %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+bs(age, 5)" ) 
 merged_data2 %>% analysis_pipe
-
-
 
