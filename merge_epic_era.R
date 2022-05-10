@@ -274,7 +274,6 @@ figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(in
 
 merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
 
-<<<<<<< HEAD
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
@@ -297,7 +296,6 @@ merged_data2[ , AbnCog := fcase(
   is.na(SBT) , AD8>=2 ,
   !(is.na(SBT) | is.na(SBT)), AD8>=2 | SBT>=5 ) ]
   
-=======
 if(FALSE) {
 ## an aside -- figure 1 type flow
 ## only 16 k hae an AD8+SBT, 30k one or the other
