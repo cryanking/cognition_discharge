@@ -279,6 +279,7 @@ merged_data2[ , AbnCog := fcase(
   
 
 
+
 merged_data2[ , dc_home := dispo!="home"]
 my_visits<- my_visits[ preop_covariates[ ,.(CurrentMRN=`Patient Primary MRN`, orlogid, AnestStop)] , allow.cartesian=TRUE, nomatch=NULL, on="CurrentMRN"]
 

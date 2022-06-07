@@ -867,6 +867,11 @@ save( file="cognition_cache.rda" ,
 )
 
 
-
+# > figure1
+#                                                 Stage     N deltaN
+# 1                                  surgeries age > 65 38005     NA
+# 2 distinct hospitalizations w / qualifying procedures  8663     NA
+# 3                              preop eval w/i 90 days  8544     NA
+# 4                            cognitive screen present  6665     NA
 
 
