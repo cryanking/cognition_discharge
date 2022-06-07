@@ -202,14 +202,6 @@ code_patterns$vats_codes <- c(code_patterns$vats_codes, cpt_code_pattern[cpt_cod
 
 
 
-## testing
-if(FALSE) {
-procedure_codes_reduced <- procedure_codes[orlogid %in% merged_data$orlogid ] 
-sum(( procedure_codes_reduced$codes %>% strsplit( split=",", fixed=T) %>% unlist %>% unname ) %chin% observed_codes[["ueavfist_codes"]][1:25] )
-
-procedure_codes_reduced
-procedure_codes_reduced[ grepl(AN_PROC_NAME, pattern="ARTERIOVENOUS", ignore.case=T) ]
-}
 
 
 ## DONE: (1) modify this to iterate over arrays, as done for mv (2) add more cpt codes
@@ -255,18 +247,6 @@ procedure_codes[ , included := rowSums(.SD, na.rm = TRUE) > 0 , .SDcols=names(co
 ## name consistency with older code
 # setnames(procedure_codes, names(code_patterns), names(code_patterns)%>% sub(pattern="_codes", replacement="") )
 
-## older way of doing it when there was only one pattern per group
-if(FALSE) {
-  included_proc_codes <- unlist(observed_codes)
-
-  ## to avoid ugly loops in R, match procedure codes to the total list of codes [chmatch is an optimized version of match() for characters], then compare that position to the length of the sets
-  for(thisp in names(code_patterns) ) {
-    set(procedure_codes , j=thisp, value=grepl(procedure_codes$codes, pattern=code_patterns[[thisp]]  )  )
-  }
-
-  procedure_codes[ , included := rowSums(.SD, na.rm = TRUE) > 0 , .SDcols=names(code_patterns) ]
-
-}
 
 
 figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(intersect(procedure_codes$orlogid , merged_data$orlogid ) ), deltaN=NA_real_) )
@@ -274,7 +254,7 @@ figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(in
 
 merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
 
-<<<<<<< HEAD
+
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
@@ -295,70 +275,14 @@ merged_data2[ , AbnCog := fcase(
   is.na(AD8) & is.na(SBT), NA, 
   is.na(AD8) , SBT>=5 ,
   is.na(SBT) , AD8>=2 ,
-  !(is.na(SBT) | is.na(SBT)), AD8>=2 | SBT>=5 ) ]
+  !(is.na(SBT) | is.na(AD8)), AD8>=2 | SBT>=5 ) ]
   
-=======
-if(FALSE) {
-## an aside -- figure 1 type flow
-## only 16 k hae an AD8+SBT, 30k one or the other
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] [ !is.na(AD8) | !is.na(SBT)]$orlogid %>% uniqueN
-
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] [ !is.na(AD8) ][!is.na(SBT)]$orlogid %>% uniqueN
-
-## these don't do anything
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
-merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% pull("orlogid") %>% uniqueN
-
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
-merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
-
-## 33k age >= 65
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
-merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
-
-## only 16 k have an AD8+SBT, 30k one or the other
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ][ !is.na(AD8) ][!is.na(SBT)] %>% 
-merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
-
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ][ !is.na(AD8) | !is.na(SBT)] %>% 
-merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% pull("orlogid") %>% uniqueN
-
-## only 13k matching procedures, some procedures like avf are just uncommon in this data
-## supported by manually scanning for text
-
-## 40k procedure code data present
-procedure_codes$CSN %>% uniqueN
-
-## 15k age > 65
-procedure_codes[preop_covariates[age >= 65], on="orlogid"]$CSN %>% uniqueN
-
-## 4.8k included
-procedure_codes[preop_covariates[age >= 65], on="orlogid"][included==TRUE, CSN] %>% uniqueN
-
-procedure_codes[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum)
-#          gut_codes      stomach_codes        chole_codes         panc_codes 
-#               3764               1213                609                556 
-#       hyster_codes       lumbar_codes     shoulder_codes hiatalHernia_codes 
-#               2343               1332               1205                183 
-#         knee_codes     totalHip_codes         neph_codes        prost_codes 
-#               1393               1432                692                823 
-#      bladder_codes     ueavfist_codes         vats_codes 
-#                206                267                162 
-
-## with ad8+sbt 3716
-
-processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ][ !is.na(AD8) ][!is.na(SBT)] %>% 
-merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>% merge(preop_covariates[age >= 65, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" ) %>% merge(procedure_codes[included==TRUE, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid") %>% pull("orlogid") %>% uniqueN
-
-}
-
-
 
 
 merged_data2[ , dc_home := dispo!="home"]
 my_visits<- my_visits[ preop_covariates[ ,.(CurrentMRN=`Patient Primary MRN`, orlogid, AnestStop)] , allow.cartesian=TRUE, nomatch=NULL, on="CurrentMRN"]
 
-los_data <- my_visits[dist>AnestStop ,.(los = min(as.numeric(difftime(dist,AnestStop) ) ), dist=min(dist) )  , by="orlogid" ]
+los_data <- my_visits[dist>AnestStop ,.(los = min(as.numeric(difftime(dist,AnestStop) ) ) )  , by="orlogid" ]
 los_data[, los:=as.numeric(los)]
 merged_data2 %<>% merge(los_data, all.x=TRUE, by="orlogid")
 
@@ -373,69 +297,7 @@ merged_data2 %<>% merge(los_data, all.x=TRUE, by="orlogid")
 
 
 ## old way of doing things, pulling discharges from nursing documents
-if(FALSE) {
-## discharge events that show up in nursing / case management flowsheets. surprisingly complete.
-## TODO: scan if missing patients are mostly "outpatient" and probably don't have this class if never admitted
-all_ts <- list.files(clarity_root , full.names=TRUE, pattern="Clarity\\sHogue\\sResult\\sSet\\sFlowsheets\\s\\d")
-all_ts %<>% grep(pattern="csv$", value=TRUE)
 
-dispo_holder<- vector('list', length(all_ts))
-for(ts_index in seq_along (all_ts) ) {
-epic_flow_1 <- fread(all_ts[ts_index] )
-dispo_holder[[ts_index]] <- epic_flow_1[MEASURE_NAME %chin% c("DISCHARGE TO" , "Discharge Disposition")]
-
-# epic_flow_1$MEASURE_NAME %>% unique -> all_measures
-# # "Discharge Location" about fluids
-# "Discharge Disposition"
-# "Discharge Records"  
-# # "DISCHARGE TO" -> 5508. good values
-# epic_flow_1[MEASURE_NAME=="DISCHARGE TO", .(INPATIENT_DATA_ID)] %>% uniqueN ## 4.9k
-# epic_flow_1[MEASURE_NAME=="Discharge Disposition", .(INPATIENT_DATA_ID)] %>% uniqueN ##2.6k
-# epic_flow_1[MEASURE_NAME=="Discharge Location", .(INPATIENT_DATA_ID)] %>% uniqueN ## 95
-# epic_flow_1[, .(INPATIENT_DATA_ID)] %>% uniqueN ## 12k
-# 
-# # "Was Patient Discharged to Home" -> only 1
-}
-
-dispo_holder %<>% rbindlist
-dispo_holder %>% saveRDS("/research/ActFast_Intermediates/dispo_status.rda")
-
-## scanning flow take a long time (IO bound), so make a copy
-dispo_holder2 <- dispo_holder[!(VALUE %chin% c("Nursing Unit", "Other (Comment)") ) ][!is.na(VALUE)]
-
-dispo_holder2[, dispo_type := fcase(
-  grepl(VALUE, pattern="Hospice", fixed=T) , "death" ,
-  VALUE=='Expired', "death" ,
-  grepl(VALUE, pattern="Hospital", fixed=T) , "facility" ,
-  grepl(VALUE, pattern="SNF", fixed=T) , "facility" ,
-  grepl(VALUE, pattern="LTAC", fixed=T) , "facility" ,
-  grepl(VALUE, pattern="Skilled", fixed=T) , "facility" ,
-  grepl(VALUE, pattern="Inpatient", fixed=T) , "facility" ,
-  grepl(VALUE, pattern="Home", fixed=T) , "home" ,
-  VALUE=='AMA', "home"
-) ]
-
-dispo_holder2 <- dispo_holder2[!is.na(dispo_type)]
-
-## I'll use this numeric version as a conveinent way to merge if there are multiple matches (which can happen if plans change)
-dispo_holder2[ , dispo_type_num := fcase( dispo_type=="death", 1L, dispo_type=="facility" , 2L, dispo_type=="home", 3L  ) ]
-
-## the flowsheets are linked by MRN and a INPATIENT_DATA_ID which doesn't seem to be used anywhere else in my ID set, so instead I need to pull in the actual admit / discharge times of the hospitalization that I am interested in, which have MRNs and the same set of CSNs used elsewhere.
-## discharge times aren't an exact science, so will give a bit of leeway
-
-dispo_holder2 <-  merge(dispo_holder2, my_visits, by="CurrentMRN", allow.cartesian=TRUE, nomatch=NULL)
-dispo_holder2 <- dispo_holder2[ data.table::between(PERFORMED, admt, dist+lubridate::dhours(12) ) ]
-dispo_holder2[, CSN := as.character(CSN)] 
-dispo_holder2 <- merge(dispo_holder2, epic_id2[ , .(AN_3_ENC_CSN_ID, LOG_ID)], by.y="AN_3_ENC_CSN_ID", by.x="CSN" )
-
-
-dispo_holder2 <- dispo_holder2[! is.na(dispo_type)] 
-dispo_holder2 <- dispo_holder2[ , .(dispo_type = min(dispo_type_num ), dist= max(dist, na.rm=T) ), by="LOG_ID" ]
-
-merged_data2 <- merged_data %>% merge(dispo_holder2, by.x="orlogid", by.y="LOG_ID")
-
-merged_data2[ , dc_home := dispo_type==3]
-}
 
 ## fixing up the death events as promised above
 merged_data2[, CSN:=as.character(CSN)]
