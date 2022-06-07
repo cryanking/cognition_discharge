@@ -27,3 +27,35 @@ Key identifiers for the data are
 - '2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx' : a record of clinic visit data and discharge status (in the Other sheet). Identifiers are CPAPPatientID (clinic event not surgery event)
 - "2020_01_King_ProcedureCodes_MostRecentCPAP.xlsx" : among other things, has the most recent CPAPPatientID for a Surg_PatientID
 
+
+# description from my POV
+4 types of ids: 
+- EMPI/Ref_no, --> common to the patient irrespective of the visit
+- MRN, 
+- PAN/visitIDcode/Reg_no --> provides one hospitization event. PAN is different for each hospitilization event
+
+must map PAN to EMPI or Reg_no to EMPI
+To find readmissions, EMPI will be helpful.
+
+'2020_02_MV_LoS.csv':  
+- Pt_id --> specific to surgery
+- PAN --> specific to hospitilization
+- EMPI --> specific to person
+
+We talked about 
+- datasets(different identifiers)
+- some people who do not appear on both datasets?
+- links needed to bring in the extra procedure codes that brought many more patients in.
+
+- signals with procedure codes has 1000 matchings.
+- Actfast proc2 has more matchings with procedure codes i.e. around 2660
+- newest preop location has 90 days data of procedures.
+- file="/research/ActFast_Intermediates/matched_proc_codes.rdata" , Actfast_proc2, actfast_proc_late, procedure_data --> must use this file for further analysis.
+
+- All_ids --> has Patient_id, EMPI, visitIDcode, ID code, DOS, DOB, case_id, person_id, stay_id, Aneststop, no_signals #Reference file for id's
+- ActFast_proc2 --> Ref_no, PAN, ICD_procedurecode, description #older I2 data/stops 2016
+- ActFastRoll2--> Ref_no, MRN, PAN, Anesthesia_start, Anesthesia_stop #older I2 data/stops 2016
+- ActFastRoll--> MRN, PAN, DOS, Ref_no, Visit no, Reg_no, Anesthesia_start, Anesthesia_stop #post 2016 data
+- ActFast_Proc--> Ref_no, Reg_no, ICD_procedure_code, description #post 2016 data
+- Procedure_data--> Ref_no, Reg_no, Facility_concept ID, ICD version NO, ICD_procedure code, description. # recent I2 query
+
