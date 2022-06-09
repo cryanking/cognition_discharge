@@ -361,10 +361,80 @@ analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes
 
 merged_data2 %>% analysis_pipe
 
+myform <- base_form %>%
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(age, 5)" )
+
+dc_home_glm <- merged_data2 %>% mutate(thisout=dc_home) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+readmit_glm  <- merged_data2 %>%filter(dispo=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+death_glm <- merged_data2 %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+los_glm <- merged_data2 %>% filter %>% filter(dispo =="home") %>% mutate(thisout=los) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() )
+coef_home <- dc_home_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_readmit <-  readmit_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_death <- death_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_los <- los_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% sprintf(fmt="%.2f") %>% paste(collapse=" to ")
+
+ci_home <- dc_home_glm %>% ci_pipe
+ci_readmit <- readmit_glm %>% ci_pipe
+ci_death <- death_glm %>% ci_pipe
+ci_los <- los_glm %>% ci_pipe
+
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
-  update( "~.+bs(age, 5)" ) 
-merged_data2 %>% analysis_pipe
+  update( "~.+bs(age, 5)" )
+
+inter_glm <- merged_data2 %>% mutate(thisout=dc_home) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
+cis_inter <-inter_glm  %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog"))
+point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+png(file="forest_home.png", width=5, height=5, units="in", res=300)
+par(mar=c(3,0,0,0))
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
+text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$rname , pos=4)
+abline(v=0)
+abline(h=-.1)
+text(x=-6, y=0.2, labels="Surgery type", pos=4)
+text(x=-3, y=0.2, labels="less dc home", pos=4)
+text(x=-0, y=0.2, labels="more dc home", pos=4)
+points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
+arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
+text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
+points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
+arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
+axis(1, at=-4, labels="odds-ratio", lwd=0)
+dev.off()
+anova(inter_glm, dc_home_glm, test="Rao")
+saveRDS(merged_data2, "merged_data_epic.RDS" )
+save( file="cognition_cache_epic.rda" ,
+figure1,
+dc_home_glm,
+readmit_glm,
+death_glm,
+los_glm,
+inter_glm,
+coef_home,
+coef_readmit,
+coef_death,
+coef_los,
+ci_home,
+ci_readmit,
+ci_death,
+ci_los,
+comborbid_vars,
+base_form,
+surg_vars,
+surg_form,
+surg_interact_form,
+comorbid_form,
+pretty_names,
+
+
 
