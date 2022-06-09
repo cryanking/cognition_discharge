@@ -465,6 +465,8 @@ axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1"
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
 anova(inter_glm, dc_home_glm, test="Rao")
+
+
 saveRDS(merged_data2, "merged_data_epic.RDS" )
 save( file="cognition_cache_epic.rda" ,
 figure1,
