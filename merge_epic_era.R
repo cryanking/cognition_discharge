@@ -482,6 +482,7 @@ dev.off()
 
 anova(inter_glm, dc_home_glm, test="Rao")
 
+setwd("/research/Actfast_reident_epic")
 saveRDS(merged_data2, "merged_data2.RDS" )
 save( file="cognition_cache_epic.rda" ,
   figure1,
