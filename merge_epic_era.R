@@ -323,6 +323,9 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
+
+swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
+
   
 comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
 
@@ -364,6 +367,59 @@ analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes
 merged_data2 %>% analysis_pipe
 
 
+if(FALSE) {
+# have issues with this formula
+analysis_pipe_vu <- function(x) {
+g1 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g2 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
+vuongtest(g1, g2)
+}
+
+
+analysis_pipe_cv <- function(x) {
+
+  x2 <- x %>% mutate(thisout=dispo!="home")
+  rs <- crossv_kfold(x2, k=100)
+  r1 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
+    map2_dbl(rs$test, function(.x, .y){
+      response <- .y %>% as.data.frame %>% pull("thisout")
+      if(n_distinct(response) > 1 ) {
+        pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) )  ) %>% auc } else {NA_real_}
+    } )
+
+  r2 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
+    response <- .y %>% as.data.frame %>% pull("thisout")
+    if(n_distinct(response) > 1 ) {
+      pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) )  ) %>% auc } else {NA_real_}
+  } )
+  t.test(na.omit(r1), na.omit(r2) )
+}
+
+global_age_spline <- bs(merged_data2$age, 3)
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) 
+#throwing error and I couldn't solve it
+# merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_cv
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,age)" ) 
+# merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_cv
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,age)" ) 
+# merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_cv
+}
+
 myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
@@ -392,54 +448,67 @@ myform <- base_form %>%
   update( "~.+bs(age, 5)" )
 
 inter_glm <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+
 point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
+
 cis_inter <-inter_glm  %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog"))
+
 point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+
 cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+
 temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+
 png(file="forest_home.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
+
 text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$rname , pos=4)
 abline(v=0)
 abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
 text(x=-3, y=0.2, labels="less dc home", pos=4)
 text(x=-0, y=0.2, labels="more dc home", pos=4)
+
 points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
+
 text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
 points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
 arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
 axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
+
 anova(inter_glm, dc_home_glm, test="Rao")
 
-
-saveRDS(merged_data2, "merged_data_epic.RDS" )
+saveRDS(merged_data2, "merged_data2.RDS" )
 save( file="cognition_cache_epic.rda" ,
-figure1,
-dc_home_glm,
-readmit_glm,
-death_glm,
-los_glm,
-inter_glm,
-coef_home,
-coef_readmit,
-coef_death,
-coef_los,
-ci_home,
-ci_readmit,
-ci_death,
-ci_los,
-comborbid_vars,
-base_form,
-surg_vars,
-surg_form,
-surg_interact_form,
-comorbid_form,
-pretty_names
+  figure1,
+  global_age_spline ,
+  dc_home_glm ,
+  readmit_glm ,
+  death_glm,
+  los_glm,
+  inter_glm, 
+  coef_home,
+  coef_readmit,
+  coef_death,
+  coef_los,
+  ci_home ,
+  ci_readmit ,
+  ci_death ,
+  ci_los ,
+  comborbid_vars ,
+  base_form ,
+  surg_vars ,
+  surg_form ,
+  surg_interact_form ,
+  comorbid_form ,
+  pretty_names #, 
+  #analysis_pipe_vu,
+  #analysis_pipe_cv
 )
+
 
 
