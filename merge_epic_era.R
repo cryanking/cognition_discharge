@@ -485,7 +485,7 @@ anova(inter_glm, dc_home_glm, test="Rao")
 saveRDS(merged_data2, "merged_data2.RDS" )
 save( file="cognition_cache_epic.rda" ,
   figure1,
-  global_age_spline ,
+  #global_age_spline ,
   dc_home_glm ,
   readmit_glm ,
   death_glm,
