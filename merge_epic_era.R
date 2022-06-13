@@ -439,9 +439,7 @@ surg_vars,
 surg_form,
 surg_interact_form,
 comorbid_form,
-pretty_names,
-analysis_pipe_vu,
-analysis_pipe_cv
+pretty_names
 )
 
 
