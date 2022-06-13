@@ -28,8 +28,8 @@ library(pROC)
 library("tableone")
 library(knitr)
 knitr::opts_chunk$set(dev = 'pdf')
-merged_data2 <- readRDS("/research/merged_data_epic.RDS" )
-load(file="/research/cognition_cache_epic.rda")
+merged_data2 <- readRDS("/research/Actfast_reident_epic/merged_data2.RDS" )
+load(file="/research/Actfast_reident_epic/cognition_cache_epic.rda")
 
 
 ```
@@ -85,7 +85,7 @@ mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "i
  temp <- capture.output(x <- print(tab3 , showAllLevels = FALSE, contDigits=0, printToggle=FALSE, nonnormal=TRUE, exact=T))
 
  rownames(x) <- rownames(x) %>% sub(pattern="= 1 (", replacement="(", fixed=T) %>% sub(pattern="= TRUE (", replacement="(", fixed=T)
- 
+
  x <- x[,setdiff(colnames(x), "test")]
 table_1_format <- kbl(x, longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, CHF = Congestive heart failure,  Diabetes = Diabetes mellitus,  COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA_Stroke = history of stroke or transient ischemic attack,  dc_home = discharge to home, readmit  = readmission within 30 days, los = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
 kable_styling(latex_options =c("striped") ) %>%
