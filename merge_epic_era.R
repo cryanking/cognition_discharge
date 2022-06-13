@@ -363,56 +363,6 @@ analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes
 
 merged_data2 %>% analysis_pipe
 
-# have issues with this formula
-analysis_pipe_vu <- function(x) {
-g1 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
-g2 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
-vuongtest(g1, g2)
-}
-
-
-analysis_pipe_cv <- function(x) {
-
-  x2 <- x %>% mutate(thisout=dispo!="home")
-  rs <- crossv_kfold(x2, k=100)
-  r1 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
-    map2_dbl(rs$test, function(.x, .y){
-      response <- .y %>% as.data.frame %>% pull("thisout")
-      if(n_distinct(response) > 1 ) {
-        pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) )  ) %>% auc } else {NA_real_}
-    } )
-
-  r2 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
-    response <- .y %>% as.data.frame %>% pull("thisout")
-    if(n_distinct(response) > 1 ) {
-      pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) )  ) %>% auc } else {NA_real_}
-  } )
-  t.test(na.omit(r1), na.omit(r2) )
-}
-
-global_age_spline <- bs(merged_data2$age, 3)
-
-myform <- base_form %>% 
-  update( paste0("~.+", surg_form) ) %>%
-  update( "~.+AbnCog" ) 
-#throwing error and I couldn't solve it
-# merged_data2  %>% analysis_pipe_vu
-merged_data2  %>% analysis_pipe_cv
-
-myform <- base_form %>% 
-  update( paste0("~.+", surg_form) ) %>%
-  update( "~.+AbnCog" ) %>%
-  update( "~.+predict(global_age_spline,age)" ) 
-# merged_data2  %>% analysis_pipe_vu
-merged_data2  %>% analysis_pipe_cv
-
-myform <- base_form %>% 
-  update( paste0("~.+", surg_form) ) %>%
-  update( paste0("~.+", comorbid_form) ) %>%
-  update( "~.+AbnCog" ) %>%
-  update( "~.+predict(global_age_spline,age)" ) 
-# merged_data2  %>% analysis_pipe_vu
-merged_data2  %>% analysis_pipe_cv
 
 myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
