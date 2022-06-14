@@ -303,7 +303,16 @@ merged_data2 %<>% merge(los_data, all.x=TRUE, by="orlogid")
 ## fixing up the death events as promised above
 merged_data2[, CSN:=as.character(CSN)]
 my_visits[, CSN:=as.character(CSN)]
-merged_data2 <- merge(merged_data2, my_visits, by="CSN", all.x=TRUE, all.y=FALSE)
+# merged_data2 <- merge(merged_data2, my_visits, by="CSN", all.x=TRUE, all.y=FALSE)
+
+testing_data2<- merge(merged_data2[, .(orlogid, AnestStart)] , my_visits[, .(orlogid, dist)], by="orlogid", all.x=TRUE, all.y=FALSE, allow.cartesian=TRUE)
+
+testing_data2 <- testing_data2[ dist > AnestStart]
+testing_data2 <- testing_data2[ , .(dist=min(dist))  , by="orlogid" ]
+
+merged_data2 <- merge(merged_data2, testing_data2 , by="orlogid", all.x=TRUE, all.y=FALSE)
+
+
 merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < dist + ddays(30), TRUE, default=FALSE) ]
 
 merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum) -> code_counts
