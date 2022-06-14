@@ -13,6 +13,9 @@ header-includes:
     - \usepackage{colortbl}
 ---
 <!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report.rmd")'
+
+export LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/christopherking/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=32GB]' -M 32GB -q general -a 'docker(cryanking/cognitioncheck:1.1)' R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report.rmd")'
+
 -->
 ```{r setup, include=FALSE}
 library("magrittr")
