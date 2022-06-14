@@ -46,5 +46,8 @@ RUN R -e 'tinytex::tlmgr_install(pkgs="amsmath")'
 # install almost all the packages needed to make the report generate
 COPY ./dummy_report.rmd /code/dummy_report.rmd
 RUN R -e 'rmarkdown::render("/code/dummy_report.rmd")'
+RUN R -e 'tinytex::tlmgr_install(pkgs=c("amsmath","environ" , "threeparttablex" , "threeparttable" , "tabu" , "varwidth" , "pdflscape" , "float" , "wrapfig" , "multirow" , "trimspaces" , "makecell" , "ulem"))' 
+
+
 
 RUN chmod -R 777 /root ; chmod -R 777 /usr/local/lib/R/site-library /usr/local/lib/R/library /usr/local/texlive/

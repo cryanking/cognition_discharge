@@ -780,8 +780,8 @@ text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=
 abline(v=0)
 abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
-text(x=-3, y=0.2, labels="less dc home", pos=4)
-text(x=-0, y=0.2, labels="more dc home", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x=-0, y=0.2, labels="less dc home", pos=4)
 
 points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
