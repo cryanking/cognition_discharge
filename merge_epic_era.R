@@ -7,6 +7,16 @@
 library(data.table)
 library(lubridate)
 library(magrittr)
+library(dplyr)  
+library(forcats)
+library(splines)
+library(nonnest2)
+library(modelr)
+library(purrr)
+library(pROC)
+
+
+
 clarity_root <- '/research/ActFast_Epic_Flow/Data 202004/Clarity data/'
 
 ## AD8, SBT pre-processed in main actfast
@@ -332,9 +342,8 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
-pretty_names <- cbind(pretty_names , names(code_patterns) %>% sub(pattern="_codes", replacement="") %>%paste0("SType_", . )  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
+pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
-swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
   
 comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
@@ -356,9 +365,7 @@ myform <- base_form %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+bs(age, 5)" ) 
 
-library(dplyr)  
-library(splines)
-library(nonnest2)
+
 
 ## surgery effects
 
@@ -433,6 +440,7 @@ merged_data2  %>% analysis_pipe_cv
 
 myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+bs(age, 5)" )
@@ -462,9 +470,9 @@ inter_glm <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= a
 
 point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
 
-cis_inter <-inter_glm  %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog"))
+cis_inter <-inter_glm  %>%  confint.default %>% as_tibble(rownames="rname")  %>% filter(grepl(rname, pattern="AbnCog"))
 
-cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") ) %>% swap_pretty_names
+cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") ) 
 
 point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 
@@ -477,12 +485,12 @@ png(file="forest_home_epic.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
 
-text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
+text(x=-2, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 abline(v=0)
 abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
 text(x=-3, y=0.2, labels="less dc home", pos=4)
-text(x=-0, y=0.2, labels="more dc home", pos=4)
+text(x= 0, y=0.2, labels="more dc home", pos=4)
 
 points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
