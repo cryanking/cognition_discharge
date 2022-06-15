@@ -338,7 +338,7 @@ pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hys
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
 
-  comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
+comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
 
 
 ## surgery specific effects - build formulas externally because of the non-factor structure
@@ -434,7 +434,6 @@ merged_data2  %>% analysis_pipe_cv
 
 myform <- base_form %>%
   update( paste0("~.+", surg_form) ) %>%
-  update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+bs(age, 5)" )
