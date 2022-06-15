@@ -7,13 +7,6 @@
 library(data.table)
 library(lubridate)
 library(magrittr)
-library(dplyr)  
-library(forcats)
-library(splines)
-library(nonnest2)
-library(modelr)
-library(purrr)
-library(pROC)
 
 
 
@@ -345,8 +338,7 @@ pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hys
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
 
-  
-comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
+  comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
 
 
 ## surgery specific effects - build formulas externally because of the non-factor structure
@@ -365,7 +357,9 @@ myform <- base_form %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+bs(age, 5)" ) 
 
-
+library(dplyr)  
+library(splines)
+library(nonnest2)
 
 ## surgery effects
 
