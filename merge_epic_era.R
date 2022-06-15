@@ -1,5 +1,6 @@
 # docker run -it --rm -v "/mnt/ris/ActFastData/:/research/"  cryanking/verse_plus R  
-
+#LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/ActFastData/:/research/  /storage1/fs1/christopherking/Active/lavanya/cognition_check/:/output/ /home/lavanya/gitrepos/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=32GB] span[hosts=1]' -M 32GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
+#Digest: sha256:9b99f73d209fb61e18cd4829f7b01c039b6645484dd1c4fa79a20d7d809b7f1d
 ## TODO: import exploratory outcomes
 ## TODO: code import analysis of outcomes -> cache
 
@@ -468,7 +469,8 @@ cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 
 temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-png(file="forest_home.png", width=5, height=5, units="in", res=300)
+setwd("/output/")
+png(file="forest_home_epic.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
 
@@ -520,5 +522,7 @@ save( file="cognition_cache_epic.rda" ,
   #analysis_pipe_cv
 )
 
+#check_repeats <- . %>% colnames %>% grepl(pattern="\\.x$") %>% any
 
+#merged_data2 %>% check_repeats
 
