@@ -332,7 +332,7 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
-pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
+pretty_names <- cbind(pretty_names , names(code_patterns) %>% sub(pattern="_codes", replacement="") %>%paste0("SType_", . )  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
 swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
@@ -377,7 +377,7 @@ analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes
 merged_data2 %>% analysis_pipe
 
 
-if(FALSE) {
+
 # have issues with this formula
 analysis_pipe_vu <- function(x) {
 g1 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
@@ -407,18 +407,19 @@ analysis_pipe_cv <- function(x) {
 
 global_age_spline <- bs(merged_data2$age, 3)
 
+if(FALSE) {
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) 
 #throwing error and I couldn't solve it
-# merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_vu
 merged_data2  %>% analysis_pipe_cv
 
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+predict(global_age_spline,age)" ) 
-# merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_vu
 merged_data2  %>% analysis_pipe_cv
 
 myform <- base_form %>% 
@@ -426,7 +427,7 @@ myform <- base_form %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+predict(global_age_spline,age)" ) 
-# merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_vu
 merged_data2  %>% analysis_pipe_cv
 }
 
@@ -463,6 +464,8 @@ point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="
 
 cis_inter <-inter_glm  %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog"))
 
+cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") ) %>% swap_pretty_names
+
 point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 
 cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
@@ -474,7 +477,7 @@ png(file="forest_home_epic.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
 
-text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$rname , pos=4)
+text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 abline(v=0)
 abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
@@ -497,7 +500,7 @@ anova(inter_glm, dc_home_glm, test="Rao")
 saveRDS(merged_data2, "merged_data2.RDS" )
 save( file="cognition_cache_epic.rda" ,
   figure1,
-  #global_age_spline ,
+  global_age_spline ,
   dc_home_glm ,
   readmit_glm ,
   death_glm,
@@ -517,9 +520,9 @@ save( file="cognition_cache_epic.rda" ,
   surg_form ,
   surg_interact_form ,
   comorbid_form ,
-  pretty_names #, 
-  #analysis_pipe_vu,
-  #analysis_pipe_cv
+  swap_pretty_names , 
+  analysis_pipe_vu,
+  analysis_pipe_cv
 )
 
 #check_repeats <- . %>% colnames %>% grepl(pattern="\\.x$") %>% any
