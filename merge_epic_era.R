@@ -378,7 +378,7 @@ analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes
 merged_data2 %>% analysis_pipe
 
 
-
+if(FALSE) {
 # have issues with this formula
 analysis_pipe_vu <- function(x) {
 g1 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
@@ -408,7 +408,7 @@ analysis_pipe_cv <- function(x) {
 
 global_age_spline <- bs(merged_data2$age, 3)
 
-if(FALSE) {
+
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) 
@@ -474,13 +474,13 @@ cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
 setwd("/output/")
-png(file="forest_home_epic.png", width=5, height=5, units="in", res=300)
+png(file="forest_home_epic.png", width=7, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-18, - 0), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 abline(v=0)
-abline(h=-.1)
+abline(h=-.5)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
 text(x=-3, y=0.2, labels="less dc home", pos=4)
 text(x= 0, y=0.2, labels="more dc home", pos=4)
@@ -501,7 +501,6 @@ anova(inter_glm, dc_home_glm, test="Rao")
 saveRDS(merged_data2, "merged_data2.RDS" )
 save( file="cognition_cache_epic.rda" ,
   figure1,
-  global_age_spline ,
   dc_home_glm ,
   readmit_glm ,
   death_glm,
@@ -521,12 +520,9 @@ save( file="cognition_cache_epic.rda" ,
   surg_form ,
   surg_interact_form ,
   comorbid_form ,
-  swap_pretty_names , 
-  analysis_pipe_vu,
-  analysis_pipe_cv
+  pretty_names 
 )
 
-#check_repeats <- . %>% colnames %>% grepl(pattern="\\.x$") %>% any
+#Checklist: problems with forest plot(first, two codes have large values, difficult to fit in the plot), analysis_pipe_vu, analysis_pipe_cu formula's throwing errors (I tried but couldn't solve it)
 
-#merged_data2 %>% check_repeats
 
