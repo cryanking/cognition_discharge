@@ -337,6 +337,8 @@ pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hys
 
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
+swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
+
 
 comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
 
@@ -520,7 +522,7 @@ save( file="cognition_cache_epic.rda" ,
   surg_form ,
   surg_interact_form ,
   comorbid_form ,
-  pretty_names 
+  swap_pretty_names 
 )
 
 #Checklist: problems with forest plot(first, two codes have large values, difficult to fit in the plot), analysis_pipe_vu, analysis_pipe_cu formula's throwing errors (I tried but couldn't solve it)
