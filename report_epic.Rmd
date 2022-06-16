@@ -77,7 +77,7 @@ outcome_factors<- c("dc_home" , "readmit", "death", "ICU" )
 outcome_con <- "los"
 con_vars <- c( 'age' )
 
-merged_data2 %>% rename(Age=age, CAD=`Coronary artery disease`, CHF=Congestive_heart_failure, Diabetes=Diabetes_mellitus , CKD=`Chronic kidney disease`) %>% 
+merged_data2 %>% 
 mutate(dc_home=dc_status=="home") %>%
 mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "impaired cognition")  ) ) %>%
  CreateTableOne(vars = c(factor_vars , con_vars, outcome_factors, outcome_con ) , strata = "AbnCog" , data = .   , factorVars = c(factor_vars, outcome_factors) ,includeNA = FALSE, test=TRUE) -> tab3
