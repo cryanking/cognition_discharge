@@ -476,11 +476,11 @@ temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filt
 setwd("/output/")
 png(file="forest_home_epic.png", width=7, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-18, - 0), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-17, 0), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 abline(v=0)
-abline(h=-.5)
+abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
 text(x=-3, y=0.2, labels="less dc home", pos=4)
 text(x= 0, y=0.2, labels="more dc home", pos=4)
