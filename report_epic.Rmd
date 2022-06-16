@@ -13,6 +13,7 @@ header-includes:
     - \usepackage{colortbl}
 ---
 <!-- docker run -v '/mnt/ris/Active/ActFastData/:/research/'  -v '/home//gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report_epic.Rmd")'
+LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/lavanya/gitrepos/cognition_discharge:/script_home/' bsub -G 'compute-christopherking' -n 4 -R 'rusage[mem=15GB] span[hosts=1]' -M 15GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
 -->
 ```{r setup, include=FALSE}
 library("magrittr")
@@ -28,8 +29,8 @@ library(pROC)
 library("tableone")
 library(knitr)
 knitr::opts_chunk$set(dev = 'pdf')
-merged_data2 <- readRDS("/research/Actfast_reident_epic/merged_data2.RDS" )
-load(file="/research/Actfast_reident_epic/cognition_cache_epic.rda")
+merged_data2 <- readRDS("/research/merged_data2.RDS" )
+load(file="/research/cognition_cache_epic.rda")
 
 
 ```
@@ -46,20 +47,19 @@ These procedures were felt to be ones with little variation in overall surgical 
 Because our principal outcomes (readmission, discharge to home) and inclusion critereon (procedure codes) are generated at the hospitalization level, we treat that as the unit of analysis.
 Readmission in 30 days and length of stay was only considered for patients with discharge to home.
 
-Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, stroke or transient ischemic attack, active cancer, and congestive heart failure.  
+Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, CVA_Stroke, cancer status, and congestive heart failure.  
 Each hospitalization can have procedures qualifying in multiple categories; we created indicator variables for each procedure category and assumed additivity for hospitalizations with more than one type of procedure. 
 Logisitic regression models with the same adjustment startegy were considered for readmission and near-term death.
 A log-link generalized linear model (quasipoisson) with the same set of adjusting variables was used for length of stay.
-
-Heterogeneity of association between abnormal cognition and outcomes was assessed using an expanded model with an interaction term and a score-test. 
-
-To compare the predictive value of AD8 and SBT, we used two approaches.
-First, we used a k-fold cross-validation method (K=100) fitting logistic regression models predicting each outcome using AD8 or SBT, then assessing the accuracy by area under the receiver operating characteristic curve in the hold-out sample. Each 100 pairs of accuracy metrics are then compared by a paired t-test.
-Second, we used the Vuong test for non-nested models [https://doi.org/10.2307/1912557](https://doi.org/10.2307/1912557) implemented by the "nonnest2" package version 0.5-5.
+# (need to check with Ryan)
+# Heterogeneity of association between abnormal cognition and outcomes was assessed using an expanded model with an interaction term and a score-test. 
+# To compare the predictive value of AD8 and SBT, we used two approaches.
+# First, we used a k-fold cross-validation method (K=100) fitting logistic regression models predicting each outcome using AD8 or SBT, then assessing the accuracy by area under the receiver operating characteristic curve in the hold-out sample. Each 100 pairs of accuracy metrics are then compared by a paired t-test.
+# Second, we used the Vuong test for non-nested models [https://doi.org/10.2307/1912557](https://doi.org/10.2307/1912557) implemented by the "nonnest2" package version 0.5-5.
 
 All analysis was conducted using R 4.1.2. A repository containing the analysis code is available at [https://github.com/cryanking/cognition_discharge](https://github.com/cryanking/cognition_discharge)
 
-## Notes from CRK
+## Notes from CRK(need to check with Ryan)
 1. Gyn-onc cases are a little problematic. We detect that they have e.g. a hysterectomy in them, but they are also giant resections.
 2. I replaced "lobectomy" (which is uncommon) with VATS. I think it might be a good idea to break the SB/CR and hysterectomy procedures into open vs not.
 3. I do not have an easy way to scan for reason for readmission
@@ -111,6 +111,6 @@ We found modest evidence of heterogeneity by type of surgery, although power for
 A forest plot is presented in Figure \@ref(fig:fig1).
 
 ```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals"}
-knitr::include_graphics("/research/forest_home.png")
+knitr::include_graphics("/research/forest_home_epic.png")
 ```
 
