@@ -7,7 +7,9 @@
 library(data.table)
 library(lubridate)
 library(magrittr)
-
+library(purrr)
+library(splines)
+library(pROC)
 
 
 clarity_root <- '/research/ActFast_Epic_Flow/Data 202004/Clarity data/'
@@ -380,11 +382,11 @@ analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes
 merged_data2 %>% analysis_pipe
 
 
-if(FALSE) {
+if(TRUE) {
 # have issues with this formula
 analysis_pipe_vu <- function(x) {
-g1 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
-g2 <- x %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g1 <- x %>% mutate(thisout=dispo!="home") %>% filter(!is.na(SBT) & ! is.na(AD8) )%>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g2 <- x %>% mutate(thisout=dispo!="home") %>% filter(!is.na(SBT) & ! is.na(AD8) )%>%mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
 vuongtest(g1, g2)
 }
 
@@ -392,15 +394,15 @@ vuongtest(g1, g2)
 analysis_pipe_cv <- function(x) {
 
   x2 <- x %>% mutate(thisout=dispo!="home")
-  rs <- crossv_kfold(x2, k=100)
-  r1 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
+  rs <- modelr::crossv_kfold(x2, k=100)
+  r1 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
     map2_dbl(rs$test, function(.x, .y){
       response <- .y %>% as.data.frame %>% pull("thisout")
       if(n_distinct(response) > 1 ) {
         pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) )  ) %>% auc } else {NA_real_}
     } )
 
-  r2 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
+  r2 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
     response <- .y %>% as.data.frame %>% pull("thisout")
     if(n_distinct(response) > 1 ) {
       pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) )  ) %>% auc } else {NA_real_}
@@ -455,13 +457,20 @@ ci_readmit <- readmit_glm %>% ci_pipe
 ci_death <- death_glm %>% ci_pipe
 ci_los <- los_glm %>% ci_pipe
 
+
+base_form <- "thisout ~ 1" %>% formula
+surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
+surg_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ) , collapse=" + ")
+surg_interact_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ),":AbnCog" ,  collapse=" + ")
+comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+bs(age, 5)" )
-
-inter_glm <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+  
+  
+inter_glm <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% mutate(across(contains("_codes"), as.numeric ) ) %>% glm(data=., formula=myform,  family=binomial() ) 
 
 point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
 
@@ -478,14 +487,14 @@ temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filt
 setwd("/output/")
 png(file="forest_home_epic.png", width=7, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-17, 0), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-14, 0), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 abline(v=0)
 abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
-text(x=-3, y=0.2, labels="less dc home", pos=4)
-text(x= 0, y=0.2, labels="more dc home", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x= 0, y=0.2, labels="less dc home", pos=4)
 
 points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
@@ -522,6 +531,7 @@ save( file="cognition_cache_epic.rda" ,
   surg_form ,
   surg_interact_form ,
   comorbid_form ,
+  pretty_names,
   swap_pretty_names 
 )
 

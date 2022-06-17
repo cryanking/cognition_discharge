@@ -657,7 +657,7 @@ analysis_pipe_cv <- function(x) {
 
   x2 <- x %>% mutate(thisout=dc_status!="home")
     ## produce a shared set of cross-validation folds - note that dplyr / magrittr do not automatically know how to turn the fold-by-ref into a dataframe for manipulation, but they seems to have added a glm method
-  rs <- crossv_kfold(x2, k=100)
+  rs <- modelr::crossv_kfold(x2, k=100)
   ## train the first model on all folds, then evaluate it on the hold out data using AUROC as a critereon - note the wrapper since at low frequency / sample size an evaluation set can have no events
   r1 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
     map2_dbl(rs$test, function(.x, .y){
