@@ -48,7 +48,7 @@ These procedures were felt to be ones with little variation in overall surgical 
 Because our principal outcomes (readmission, discharge to home) and inclusion critereon (procedure codes) are generated at the hospitalization level, we treat that as the unit of analysis.
 Readmission in 30 days and length of stay was only considered for patients with discharge to home.
 
-Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, CVA or TIA, cancer status, and congestive heart failure.  
+Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, CVA(TIA), cancer status, and congestive heart failure.  
 Each hospitalization can have procedures qualifying in multiple categories; we created indicator variables for each procedure category and assumed additivity for hospitalizations with more than one type of procedure. 
 Logisitic regression models with the same adjustment startegy were considered for readmission and near-term death.
 A log-link generalized linear model (quasipoisson) with the same set of adjusting variables was used for length of stay.
@@ -81,7 +81,7 @@ mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "i
  rownames(x) <- rownames(x) %>% sub(pattern="= 1 (", replacement="(", fixed=T) %>% sub(pattern="= TRUE (", replacement="(", fixed=T)
 
  x <- x[,setdiff(colnames(x), "test")]
-table_1_format <- kbl(x, longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, CHF = Congestive heart failure,  Diabetes = Diabetes mellitus,  COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA\\ (TIA \\ ) = history of stroke or transient ischemic attack,  dc\\_home = discharge to home, readmit  = readmission within 30 days, los = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
+table_1_format <- kbl(x, longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, CHF = Congestive heart failure,  Diabetes = Diabetes mellitus,  COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA\\ (TIA\\ ) = history of stroke or transient ischemic attack,  dc\\_home = discharge to home, readmit  = readmission within 30 days, los = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
 kable_styling(latex_options =c("striped") ) %>%
   add_indent( grep(rownames(x), pattern="^\\s+" ) )
 # %>% 
