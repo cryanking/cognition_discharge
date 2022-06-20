@@ -336,7 +336,7 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 #      bladder_codes     ueavfist_codes         vats_codes 
 #                 92                  7                 49 
 
-setnames(merged_data2, "CVA_Stroke", "`CVA(TIA)`")
+
 setDF(merged_data2)                                                                                
 merged_data2$RACE %<>% as.character
 merged_data2$RACE %<>% as.factor %>% fct_other(keep=c("-1", "0", "1", "2", "3")) %>% fct_recode(White = "0", Black = "1", Other = "-1", Asian = "2", other_pacific_islands = "3") %>% fct_explicit_na                                                                                
