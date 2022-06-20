@@ -383,7 +383,6 @@ merged_data2 %>% analysis_pipe
 
 
 if(TRUE) {
-# have issues with this formula
 analysis_pipe_vu <- function(x) {
 g1 <- x %>% mutate(thisout=dispo!="home") %>% filter(!is.na(SBT) & ! is.na(AD8) )%>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
 g2 <- x %>% mutate(thisout=dispo!="home") %>% filter(!is.na(SBT) & ! is.na(AD8) )%>%mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
@@ -532,8 +531,10 @@ save( file="cognition_cache_epic.rda" ,
   surg_interact_form ,
   comorbid_form ,
   pretty_names,
-  swap_pretty_names 
-)
+  swap_pretty_names,
+  analysis_pipe_vu,
+  analysis_pipe_cv
+  )
 
 #Checklist: problems with forest plot(first, two codes have large values, difficult to fit in the plot), analysis_pipe_vu, analysis_pipe_cu formula's throwing errors (I tried but couldn't solve it)
 
