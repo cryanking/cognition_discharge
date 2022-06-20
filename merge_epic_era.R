@@ -475,7 +475,7 @@ point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="
 
 cis_inter <-inter_glm  %>%  confint.default %>% as_tibble(rownames="rname")  %>% filter(grepl(rname, pattern="AbnCog"))
 
-cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") ) 
+cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") )  %>% swap_pretty_names
 
 point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 
