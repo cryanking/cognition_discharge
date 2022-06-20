@@ -10,6 +10,7 @@ library(magrittr)
 library(purrr)
 library(splines)
 library(pROC)
+library(tidyverse)
 
 
 clarity_root <- '/research/ActFast_Epic_Flow/Data 202004/Clarity data/'
@@ -332,8 +333,17 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 #      bladder_codes     ueavfist_codes         vats_codes 
 #                 92                  7                 49 
 
-
-
+setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")
+                                                                                
+merged_data2$RACE %>% as.character
+merged_data2$RACE %<>% as.factor %>% fct_other(keep=c("-1", "0", "1", "2", "3")) %>% fct_reco
+de(White = "0", Black = "1", Other = "-1", Asian = "2", other_pacific_islands = "3")
+ %>% fct_explicit_na                                                                                
+merged_data2$cancerStatus %>% as.character                                                                                
+merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4")) %>% fct_r
+ecode(`Metastatic Cancer` = "4", `Skin Cancer` = "0", `in remission/radiation/chemo`
+ = "2", `Current Cancer` = "3") %>% fct_explicit_na
+                                                                                
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
@@ -342,7 +352,7 @@ pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c(
 swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
 
-comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
+comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA(TIA)" , "cancerStatus", "Diabetes" )
 
 
 ## surgery specific effects - build formulas externally because of the non-factor structure
@@ -506,8 +516,9 @@ axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
 
 anova(inter_glm, dc_home_glm, test="Rao")
+                                                                                
 
-
+                                                                                
 saveRDS(merged_data2, "merged_data2.RDS" )
 save( file="cognition_cache_epic.rda" ,
   figure1,
