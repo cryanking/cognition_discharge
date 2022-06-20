@@ -515,7 +515,7 @@ dev.off()
 anova(inter_glm, dc_home_glm, test="Rao")
                                                                                 
 
-                                                                                
+setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               
 saveRDS(merged_data2, "merged_data2.RDS" )
 save( file="cognition_cache_epic.rda" ,
   figure1,
