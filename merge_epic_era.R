@@ -11,6 +11,9 @@ library(purrr)
 library(splines)
 library(pROC)
 library(tidyverse)
+library(dplyr)  
+library(splines)
+library(nonnest2)
 
 
 clarity_root <- '/research/ActFast_Epic_Flow/Data 202004/Clarity data/'
@@ -371,9 +374,7 @@ myform <- base_form %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+bs(age, 5)" ) 
 
-library(dplyr)  
-library(splines)
-library(nonnest2)
+
 
 ## surgery effects
 
