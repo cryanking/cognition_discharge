@@ -28,6 +28,7 @@ library(purrr)
 library(pROC)
 library("tableone")
 library(knitr)
+library(dplyr)
 knitr::opts_chunk$set(dev = 'pdf')
 merged_data2 <- readRDS("/research/merged_data2.RDS" )
 load(file="/research/cognition_cache_epic.rda")
@@ -80,7 +81,7 @@ mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "i
  rownames(x) <- rownames(x) %>% sub(pattern="= 1 (", replacement="(", fixed=T) %>% sub(pattern="= TRUE (", replacement="(", fixed=T)
 
  x <- x[,setdiff(colnames(x), "test")]
-table_1_format <- kbl(x, longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, CHF = Congestive heart failure,  Diabetes = Diabetes mellitus,  COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA\\(TIA\\) = history of stroke or transient ischemic attack,  dc\\_home = discharge to home, readmit  = readmission within 30 days, los = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
+table_1_format <- kbl(x, longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, CHF = Congestive heart failure,  Diabetes = Diabetes mellitus,  COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA\\ (TIA \\ ) = history of stroke or transient ischemic attack,  dc\\_home = discharge to home, readmit  = readmission within 30 days, los = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
 kable_styling(latex_options =c("striped") ) %>%
   add_indent( grep(rownames(x), pattern="^\\s+" ) )
 # %>% 
@@ -91,7 +92,7 @@ table_1_format
 
 The frequency of each type of surgery is displayed in \@ref(tab:descType). The frequencies do not add up to the number of hospitalizations because of multiple procedures per hospitalization.
 ```{r tabletwo, echo=FALSE, messages=FALSE, results='asis'}
-merged_data2 %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>% set_colnames(c('Surgery Type', 'N')) %>% arrange(N) %>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
+merged_data2 %>% select(-c("vats_codes", "ueavfist_codes")) %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery Type', 'N')) %>% arrange(N)%>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
 ```
 
 
