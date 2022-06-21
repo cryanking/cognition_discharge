@@ -7,6 +7,7 @@ output:
 title: "Epic data Results"
 author: 
  - "C Ryan King, MD PhD"
+ - "Havisha Pedamallu, PharmD MS"
  
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
@@ -98,10 +99,10 @@ merged_data2 %>% select(-c("vats_codes", "ueavfist_codes")) %>% summarize(across
 
 We found that impaired cognition was `r if_else(coef_home[4] < .05, "" ,  "not ")` significantly associated with discharge to home (odds ratio `r paste0(exp(coef_home[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_home)`, p = `r coef_home[4] %>% format.pval(eps=.001, digits=3)`).
 For readmission in 30 days, impaired cognition was `r if_else(coef_readmit[4] < .05,"",  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_readmit[2])%>% round(2) %>% sprintf(fmt="%.2f") , ", 95\\% CI ", ci_readmit)`, p = `r coef_readmit[3] %>% format.pval(eps=.001, digits=3)`).
-Similarly for near-term death, impaired cognition was `r if_else(coef_death[4] < .05,"",  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_death[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_death)`, p = `r coef_death[4] %>% format.pval(eps=.001, digits=3)`).
-Similarly, impaired cognition was `r if_else(coef_los[4] < .05,"",  "not ")` a significant predictor of length of stay (duration ratio `r paste0(exp(coef_los[3])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_los)`, p = `r coef_los[4] %>%  sprintf(fmt="%.3f")`).
+For near-term death, impaired cognition was `r if_else(coef_death[4] < .05,"",  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_death[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_death)`, p = `r coef_death[4] %>% format.pval(eps=.001, digits=3)`).
+Impaired cognition was `r if_else(coef_los[4] < .05,"",  "not ")` a significant predictor of length of stay (duration ratio `r paste0(exp(coef_los[3])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_los)`, p = `r coef_los[4] %>%  sprintf(fmt="%.3f")`).
 
-We found modest evidence of heterogeneity by type of surgery, although power for this question is limited by small sample sizes in some surgery types. A score test comparing models with and without interaction terms yielded a p-value of `r anova(inter_glm, dc_home_glm, test="Rao")  %>% select(starts_with("Pr"))  %>% extract2(2,1) %>% sprintf(fmt="%.3f")`
+We found no convincing evidence of heterogeneity by type of surgery, although power for this question is limited by small sample sizes in some surgery types. A score test comparing models with and without interaction terms yielded a p-value of `r anova(inter_glm, dc_home_glm, test="Rao")  %>% select(starts_with("Pr"))  %>% extract2(2,1) %>% sprintf(fmt="%.3f")`
 A forest plot is presented in Figure \@ref(fig:fig1).
 
 ```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals"}
