@@ -114,7 +114,7 @@ Glm was claculated for the exploratory outcomes such as Pneumonia, AF, Post AKI 
 exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:descType}Glm for exploratory outcomes")
 ```
 
-Vuongtest Results a little confusion of how to interpret the results Table \@ref(tab:descType). 
+
 ```{r tablefour, echo=FALSE, messages=FALSE, results='asis'}
 analysis_pipe_vu_output  %>% kbl( caption="\\label{tab:descType}Vuongtest Results")
 ```
