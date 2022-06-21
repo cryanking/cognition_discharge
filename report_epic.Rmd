@@ -7,7 +7,7 @@ output:
 title: "Epic data Results"
 author: 
  - "C Ryan King, MD PhD"
- - "Havisha Pedamallu, PharmD MS"
+ - "Lavanya Pedamallu, PharmD MS"
  
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
@@ -109,3 +109,17 @@ A forest plot is presented in Figure \@ref(fig:fig1).
 knitr::include_graphics("/research/forest_home_epic.png")
 ```
 
+Glm was claculated for the exploratory outcomes such as Pneumonia, AF, Post AKI status, CVA, Post trop high, Respiratory failure Table \@ref(tab:descType). 
+```{r tablethree, echo=FALSE, messages=FALSE, results='asis'}
+exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:descType}Glm for exploratory outcomes")
+```
+
+Vuongtest Results a little confusion of how to interpret the results Table \@ref(tab:descType). 
+```{r tablefour, echo=FALSE, messages=FALSE, results='asis'}
+analysis_pipe_vu_output  %>% kbl( caption="\\label{tab:descType}Vuongtest Results")
+```
+
+It is concluded that from the results that there is significant difference in mean of x mean of y Table \@ref(tab:descType). 
+```{r tablefive, echo=FALSE, messages=FALSE, results='asis'}
+analysis_pipe_cv_output %>% kbl( caption="\\label{tab:descType}Crossv_kfold Results")
+```
