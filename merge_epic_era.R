@@ -353,7 +353,7 @@ merged_data2$cancerStatus %<>% as.character
 merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4")) %>% fct_recode(`Metastatic Cancer` = "4", `Skin Cancer` = "0", `in remission/radiation/chemo`= "2", `Current Cancer` = "3") %>% fct_explicit_na
 # setDT(merged_data2)                                                                               
 
-merged_data2 <- merge( exploratory_outcomes, by = "orlogid", all.x=TRUE)
+merged_data2 <- merge(merged_data2, exploratory_outcomes, by = "orlogid", all.x=TRUE)
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
