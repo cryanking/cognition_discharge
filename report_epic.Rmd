@@ -115,11 +115,9 @@ exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:descType}Glm for explora
 ```
 
 
-```{r tablefour, echo=FALSE, messages=FALSE, results='asis'}
-analysis_pipe_vu_output  %>% kbl( caption="\\label{tab:descType}Vuongtest Results")
-```
 
-It is concluded that from the results that there is significant difference in mean of x mean of y Table \@ref(tab:descType). 
-```{r tablefive, echo=FALSE, messages=FALSE, results='asis'}
-analysis_pipe_cv_output %>% kbl( caption="\\label{tab:descType}Crossv_kfold Results")
+
+
+```{r}
+print(as.matrix(exploratory_outcomes_glm), quote =FALSE)
 ```
