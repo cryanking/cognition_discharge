@@ -433,7 +433,6 @@ global_age_spline <- bs(merged_data2$age, 3)
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( "~.+AbnCog" ) 
-#throwing error and I couldn't solve it
 merged_data2  %>% analysis_pipe_vu
 merged_data2  %>% analysis_pipe_cv
 
@@ -449,8 +448,8 @@ myform <- base_form %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+predict(global_age_spline,age)" ) 
-merged_data2  %>% analysis_pipe_vu
-merged_data2  %>% analysis_pipe_cv
+analysis_pipe_vu_output <- merged_data2  %>% analysis_pipe_vu
+analysis_pipe_cv_output <- merged_data2  %>% analysis_pipe_cv
 }
 
 myform <- base_form %>%
@@ -524,7 +523,41 @@ axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
 
 anova(inter_glm, dc_home_glm, test="Rao")
-                                                                                
+
+
+# exploratory outcomes
+
+# CVA
+CVA_glm <- merged_data2 %>% mutate(thisout=CVA) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_CVA <- CVA_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_CVA <- coef_CVA %>% add_column(exploratory_outcomes= "CVA")
+
+# AF
+AF_glm <- merged_data2 %>% mutate(thisout=AF) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_AF <- AF_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)  
+coef_AF <- coef_AF %>% add_column(exploratory_outcomes= "AF")
+
+# PNA
+PNA_glm <- merged_data2 %>% mutate(thisout=PNA) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_PNA <- PNA_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_PNA <- coef_PNA %>% add_column(exploratory_outcomes= "PNA")
+
+# post_aki_status
+post_AKI_glm <- merged_data2 %>% mutate(thisout=post_aki_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_post_AKI <- post_AKI_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_post_AKI <- coef_post_AKI %>% add_column(exploratory_outcomes= "post_aki_status")
+
+# postop_top_high
+postop_top_high_glm <- merged_data2 %>% mutate(thisout=postop_trop_high) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_postop_trop_high <- postop_top_high_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_postop_trop_high <- coef_postop_trop_high %>% add_column(exploratory_outcomes= "post_trop_high")
+
+# resp_failure
+resp_failure_glm <- merged_data2 %>% mutate(thisout=resp_failure) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_resp_failure <- resp_failure_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_resp_failure <- coef_resp_failure  %>% add_column(exploratory_outcomes= "resp_failure")
+
+exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure)
 
 setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               
 saveRDS(merged_data2, "merged_data2.RDS" )
@@ -551,8 +584,9 @@ save( file="cognition_cache_epic.rda" ,
   comorbid_form ,
   pretty_names,
   swap_pretty_names,
-  analysis_pipe_vu,
-  analysis_pipe_cv
+  analysis_pipe_vu_output,
+  analysis_pipe_cv_output,
+  exploratory_outcomes_glm 
   )
 
 
