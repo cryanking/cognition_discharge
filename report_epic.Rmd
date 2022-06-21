@@ -91,7 +91,7 @@ kable_styling(latex_options =c("striped") ) %>%
 table_1_format
 ```
 
-The frequency of each type of surgery is displayed in \@ref(tab:descType). The frequencies do not add up to the number of hospitalizations because of multiple procedures per hospitalization.
+The frequency of each type of surgery is displayed in Table \@ref(tab:descType). The frequencies do not add up to the number of hospitalizations because of multiple procedures per hospitalization.
 ```{r tabletwo, echo=FALSE, messages=FALSE, results='asis'}
 merged_data2 %>% select(-c("vats_codes", "ueavfist_codes")) %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery Type', 'N')) %>% arrange(N)%>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
 ```
