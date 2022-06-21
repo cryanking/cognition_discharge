@@ -525,6 +525,13 @@ dev.off()
 anova(inter_glm, dc_home_glm, test="Rao")
 
 
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,age)" ) 
+
+
 # exploratory outcomes
 
 # CVA
@@ -558,6 +565,8 @@ coef_resp_failure <- resp_failure_glm  %>% summary %>% extract2("coefficients") 
 coef_resp_failure <- coef_resp_failure  %>% add_column(exploratory_outcomes= "resp_failure")
 
 exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure)
+
+
 
 setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               
 saveRDS(merged_data2, "merged_data2.RDS" )
