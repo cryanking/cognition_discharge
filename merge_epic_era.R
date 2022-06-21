@@ -2,7 +2,6 @@
 #LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/ActFastData/:/research/  /storage1/fs1/christopherking/Active/lavanya/cognition_check/:/output/ /home/lavanya/gitrepos/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=32GB] span[hosts=1]' -M 32GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
 #Digest: sha256:9b99f73d209fb61e18cd4829f7b01c039b6645484dd1c4fa79a20d7d809b7f1d
 ## TODO: import exploratory outcomes
-## TODO: code import analysis of outcomes -> cache
 
 library(data.table)
 library(lubridate)
@@ -32,6 +31,16 @@ death_outcomes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 2.csv
 preop_covariates <- merge(death_outcomes, preop_covariates, by.y="CurrentMRN", by.x="Patient Primary MRN", all.y=T)
 
 procedure_codes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 4.csv', sep=";" )
+
+merged_post <- fread( "/research/Actfast_deident_epic/epic_outcomes.csv" )
+matching_ids <- fread( "/research/Actfast_reident_epic/epic_orlogid_codes.csv" )
+setnames(merged_post, "orlogid", "orlogid_encoded")
+
+exploratory_outcomes <- matching_ids[ , .(orlogid,orlogid_encoded) ][merged_post[ , .(orlogid_encoded, PNA, AF, post_aki_status, CVA, postop_trop_high, postop_vent_duration ) ] , on="orlogid_encoded"]
+exploratory_outcomes[, orlogid_encoded:= NULL]
+exploratory_outcomes[ ,post_aki_status := post_aki_status >= 2 ]
+exploratory_outcomes[ ,resp_failure := fcase( is.na(postop_vent_duration), FALSE, postop_vent_duration < 1, FALSE, default=TRUE) ]
+exploratory_outcomes[, postop_vent_duration:= NULL]
 
 ## admission data to get discharge times
 epic_admits <- fread(paste0(clarity_root , 'Clarity Hogue Result Set ADT.csv'))
@@ -544,6 +553,5 @@ save( file="cognition_cache_epic.rda" ,
   analysis_pipe_cv
   )
 
-#Checklist: problems with forest plot(first, two codes have large values, difficult to fit in the plot), analysis_pipe_vu, analysis_pipe_cu formula's throwing errors (I tried but couldn't solve it)
 
 
