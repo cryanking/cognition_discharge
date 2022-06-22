@@ -111,13 +111,14 @@ knitr::include_graphics("/research/forest_home_epic.png")
 
 Glm was claculated for the exploratory outcomes such as Pneumonia, AF, Post AKI status, CVA, Post trop high, Respiratory failure Table \@ref(tab:descType). 
 ```{r tablethree, echo=FALSE, messages=FALSE, results='asis'}
-exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:descType}Glm for exploratory outcomes")
+exploratory_outcomes_glm %>%  %>% kbl( caption="\\label{tab:descType}GLM for exploratory outcomes")
 ```
 
+We found that Non-nested likelihood ration test was not significant with the p values ` r print(analysis_pipe_vu_output$p_LRT)
 ```{r tablefour, echo=FALSE, results='asis'}
-analysis_pipe_vu_output %>% kbl( caption="\\label{tab:descType}output")
+print(analysis_pipe_vu_output)
 ```
 
-It is concluded that from the results that there is significant difference in mean of x mean of y Table \@ref(tab:descType). 
 ```{r tablefive, echo=FALSE, results='asis'}
-analysis_pipe_cv_output %>% kbl( caption="\\label{tab:descType}output two")
+print(analysis_pipe_cv_output)
+```
