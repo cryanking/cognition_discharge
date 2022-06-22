@@ -110,7 +110,7 @@ knitr::include_graphics("/research/forest_home_epic.png")
 ```
 
 ## Exploratory clinical outcomes
-Results from logistic regression models predicting pneumonia (PNA), incident Atrial Fibrilation (AF), AKI worse than grade 1, incident stroke or TIA (CVA), elevated postop troponin, and intubation longer than 12 hous are given in Table \@ref(tab:GLM2). 
+Results from logistic regression models predicting pneumonia (PNA), incident Atrial Fibrilation (AF), AKI worse than grade 1, incident stroke or TIA (CVA), elevated postop troponin, and intubation longer than 12 hours are given in Table \@ref(tab:GLM2). 
 ```{r tablethree, echo=FALSE, messages=FALSE, results='asis'}
 exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:GLM2}GLM results for exploratory outcomes. Odds ratios, 95\\% confidence intervals, and p-values.")
 ```
