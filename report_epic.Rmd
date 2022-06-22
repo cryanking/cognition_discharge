@@ -114,3 +114,10 @@ Glm was claculated for the exploratory outcomes such as Pneumonia, AF, Post AKI 
 exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:descType}Glm for exploratory outcomes")
 ```
 
+```{r tablefour, echo=FALSE, results='asis'}
+analysis_pipe_vu_output %>% kbl( caption="\\label{tab:descType}output")
+```
+
+It is concluded that from the results that there is significant difference in mean of x mean of y Table \@ref(tab:descType). 
+```{r tablefive, echo=FALSE, results='asis'}
+analysis_pipe_cv_output %>% kbl( caption="\\label{tab:descType}output two")
