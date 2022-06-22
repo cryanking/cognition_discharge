@@ -586,9 +586,13 @@ ci_resp_failure <- resp_failure_glm %>% ci_pipe %>% mutate_if(is.numeric, round,
 coef_resp_failure <- bind_cols(coef_resp_failure, ci_resp_failure) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
 
 exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure)
-exploratory_outcomes_glm<- exploratory_outcomes_glm %>% select(-c("rname", "Estimate")) 
-exploratory_outcomes_glm$`Pr(>|z|)` <- round(exploratory_outcomes_glm$`Pr(>|z|)`, digits = 3)
-exploratory_outcomes_glm $`Std. Error` <- round(exploratory_outcomes_glm$`Std. Error`, digits = 2)
+exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
+exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["97.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm %<>% rename(`p val`= `Pr(>|z|)`)
+exploratory_outcomes_glm[["p val"]] %<>% exp %>% round(3) %>% format.pval(eps=.001)  
+# exploratory_outcomes_glm $`Std. Error` <- round(exploratory_outcomes_glm$`Std. Error`, digits = 2)
 
 
 setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               

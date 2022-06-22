@@ -49,9 +49,9 @@ These procedures were felt to be ones with little variation in overall surgical 
 Because our principal outcomes (readmission, discharge to home) and inclusion critereon (procedure codes) are generated at the hospitalization level, we treat that as the unit of analysis.
 Readmission in 30 days and length of stay was only considered for patients with discharge to home.
 
-Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, CVA(TIA), cancer status, and congestive heart failure.  
+Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) and discharge to other than home was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, CVA(TIA), cancer status, and congestive heart failure.  
 Each hospitalization can have procedures qualifying in multiple categories; we created indicator variables for each procedure category and assumed additivity for hospitalizations with more than one type of procedure. 
-Logisitic regression models with the same adjustment startegy were considered for readmission and near-term death.
+Logisitic regression models with the same adjustment startegy were considered for readmission, near-term death, and exploratory clinical outcomes.
 A log-link generalized linear model (quasipoisson) with the same set of adjusting variables was used for length of stay.
 
 Heterogeneity of association between abnormal cognition and outcomes was assessed using an expanded model with an interaction term and a score-test. 
@@ -109,9 +109,10 @@ A forest plot is presented in Figure \@ref(fig:fig1).
 knitr::include_graphics("/research/forest_home_epic.png")
 ```
 
-Glm was claculated for the exploratory outcomes such as Pneumonia, AF, Post AKI status, CVA, Post trop high, Respiratory failure Table \@ref(tab:descType). 
+## Exploratory clinical outcomes
+Results from logistic regression models predicting pneumonia (PNA), incident Atrial Fibrilation (AF), AKI worse than grade 1, incident stroke or TIA (CVA), elevated postop troponin, and intubation longer than 12 hous are given in Table \@ref(tab:GLM2). 
 ```{r tablethree, echo=FALSE, messages=FALSE, results='asis'}
-exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:descType}Glm for exploratory outcomes")
+exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:GLM2}GLM results for exploratory outcomes. Odds ratios, 95\% confidence intervals, and p-values.")
 ```
 
 ```{r tablefour, echo=FALSE, results='asis'}
