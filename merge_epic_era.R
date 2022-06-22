@@ -566,6 +566,8 @@ coef_resp_failure <- coef_resp_failure  %>% add_column(exploratory_outcomes= "re
 
 exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure)
 
+exploratory_outcomes_glm  <- exploratory_outcomes_glm %>% relocate(exploratory_outcomes, .before = rname)
+
 
 
 setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               
