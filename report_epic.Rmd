@@ -112,7 +112,7 @@ knitr::include_graphics("/research/forest_home_epic.png")
 ## Exploratory clinical outcomes
 Results from logistic regression models predicting pneumonia (PNA), incident Atrial Fibrilation (AF), AKI worse than grade 1, incident stroke or TIA (CVA), elevated postop troponin, and intubation longer than 12 hous are given in Table \@ref(tab:GLM2). 
 ```{r tablethree, echo=FALSE, messages=FALSE, results='asis'}
-exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:GLM2}GLM results for exploratory outcomes. Odds ratios, 95\% confidence intervals, and p-values.")
+exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:GLM2}GLM results for exploratory outcomes. Odds ratios, 95\\% confidence intervals, and p-values.")
 ```
 
 We found that the Vuong test of model superiority for predicting discharge location with AD8 vs SBT was `r if_else(analysis_pipe_vu_output$p_LRT %>% unlist %>% min %>% is_less_than(.05), "" ,  "not ")` significant with the minimum p value `r print(analysis_pipe_vu_output$p_LRT%>% unlist %>% min %>% round(3) %>% format.pval(eps=.001)  )`. 
