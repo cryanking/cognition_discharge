@@ -591,7 +591,7 @@ exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
 exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
 exploratory_outcomes_glm[["97.5 %"]] %<>% exp %>% round(2)
 exploratory_outcomes_glm %<>% rename(`p val`= `Pr(>|z|)`)
-exploratory_outcomes_glm[["p val"]] %<>% exp %>% round(3) %>% format.pval(eps=.001)  
+exploratory_outcomes_glm[["p val"]] %<>%  round(3) %>% format.pval(eps=.001)  
 # exploratory_outcomes_glm $`Std. Error` <- round(exploratory_outcomes_glm$`Std. Error`, digits = 2)
 
 
