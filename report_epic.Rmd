@@ -114,10 +114,3 @@ Glm was claculated for the exploratory outcomes such as Pneumonia, AF, Post AKI 
 exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:descType}Glm for exploratory outcomes")
 ```
 
-
-
-
-
-```{r}
-print(as.matrix(exploratory_outcomes_glm), quote =FALSE)
-```
