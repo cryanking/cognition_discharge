@@ -577,7 +577,7 @@ ci_PNA <- PNA_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% 
 coef_PNA <- bind_cols(coef_PNA, ci_PNA) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
 
 ci_AKI <- post_AKI_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
-coef_post_AKI<- bind_cols(coef_post_AKI, ci_AKI) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
+coef_post_AKI<- bind_cols(coef_post_AKI, ci_AKI) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 ci_postop_top_high <- postop_top_high_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
 coef_postop_trop_high <- bind_cols(coef_postop_trop_high , ci_postop_top_high) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
