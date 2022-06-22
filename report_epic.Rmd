@@ -114,7 +114,7 @@ Glm was claculated for the exploratory outcomes such as Pneumonia, AF, Post AKI 
 exploratory_outcomes_glm %>% kbl( caption="\\label{tab:descType}GLM for exploratory outcomes")
 ```
 
-We found that Non-nested likelihood ration test was not significant with the p values ` r print(analysis_pipe_vu_output$p_LRT)
+We found that Non-nested likelihood ration test was not significant with the p values ` r print(analysis_pipe_vu_output$p_LRT)`
 ```{r tablefour, echo=FALSE, results='asis'}
 print(analysis_pipe_vu_output)
 ```
