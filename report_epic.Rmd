@@ -117,12 +117,12 @@ exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:GLM2}GLM results for exp
 
 We found that the Vuong test of model superiority for predicting discharge location with AD8 vs SBT was `r if_else(analysis_pipe_vu_output$p_LRT %>% unlist %>% min %>% is_less_than(.05), "" ,  "not ")` significant with the minimum p value `r print(analysis_pipe_vu_output$p_LRT%>% unlist %>% min %>% round(3) %>% format.pval(eps=.001)  )`. 
 
-```{r tablefour, echo=FALSE, results='asis'}
+```{r tablefour, echo=FALSE}
 print(analysis_pipe_vu_output)
 ```
 
 Using the hold-out-sample area under the receiver operating curve concluded that there was `r if_else(analysis_pipe_cv_output$p.value %>% is_less_than(.05), "" ,  "not ")` significantly different using SBT and AD8. The mean AUROC estimates were `r analysis_pipe_cv_output$estimate %>% unname %>% round(3) %>% formatC( format='f', digits=3 ) %>% paste(collapse=" and ")` respectively with a p value of `r print(analysis_pipe_cv_output$p.value%>% round(3) %>% format.pval(eps=.001)  )`.
 
-```{r tablefive, echo=FALSE, results='asis'}
+```{r tablefive, echo=FALSE}
 print(analysis_pipe_cv_output)
 ```
