@@ -568,22 +568,22 @@ coef_resp_failure <- coef_resp_failure  %>% add_column(exploratory_outcomes= "re
 ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) 
 
 ci_CVA <- CVA_glm  %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3) %>% select(-"rname")
-coef_CVA <- bind_cols(coef_CVA, ci_CVA) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
+coef_CVA <- bind_cols(coef_CVA, ci_CVA) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 ci_AF <- AF_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
-coef_AF <- bind_cols(coef_AF, ci_AF) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
+coef_AF <- bind_cols(coef_AF, ci_AF) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 ci_PNA <- PNA_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
-coef_PNA <- bind_cols(coef_PNA, ci_PNA) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
+coef_PNA <- bind_cols(coef_PNA, ci_PNA) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 ci_AKI <- post_AKI_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
 coef_post_AKI<- bind_cols(coef_post_AKI, ci_AKI) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 ci_postop_top_high <- postop_top_high_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
-coef_postop_trop_high <- bind_cols(coef_postop_trop_high , ci_postop_top_high) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
+coef_postop_trop_high <- bind_cols(coef_postop_trop_high , ci_postop_top_high) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 ci_resp_failure <- resp_failure_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
-coef_resp_failure <- bind_cols(coef_resp_failure, ci_resp_failure) %>% relocate(exploratory_outcomes, .before = `Std. Error`) 
+coef_resp_failure <- bind_cols(coef_resp_failure, ci_resp_failure) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure)
 exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
