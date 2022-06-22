@@ -115,10 +115,11 @@ Results from logistic regression models predicting pneumonia (PNA), incident Atr
 exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:GLM2}GLM results for exploratory outcomes. Odds ratios, 95\% confidence intervals, and p-values.")
 ```
 
+We found that Non-nested likelihood ration test was not significant with the p values ` r print(analysis_pipe_vu_output$p_LRT)`
 ```{r tablefour, echo=FALSE, results='asis'}
-analysis_pipe_vu_output %>% kbl( caption="\\label{tab:descType}output")
+print(analysis_pipe_vu_output)
 ```
 
-It is concluded that from the results that there is significant difference in mean of x mean of y Table \@ref(tab:descType). 
 ```{r tablefive, echo=FALSE, results='asis'}
-analysis_pipe_cv_output %>% kbl( caption="\\label{tab:descType}output two")
+print(analysis_pipe_cv_output)
+```
