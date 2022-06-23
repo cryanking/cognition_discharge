@@ -564,6 +564,11 @@ resp_failure_glm <- merged_data2 %>% mutate(thisout=resp_failure) %>% mutate(Abn
 coef_resp_failure <- resp_failure_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
 coef_resp_failure <- coef_resp_failure  %>% add_column(exploratory_outcomes= "resp_failure")
 
+# ICU
+ICU_glm <- merged_data2 %>% mutate(thisout=ICU) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_ICU <- ICU_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_ICU <- coef_ICU  %>% add_column(exploratory_outcomes= "ICU")                                                                                
+                                                                                
 # conference Intervel
 ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) 
 
@@ -584,8 +589,11 @@ coef_postop_trop_high <- bind_cols(coef_postop_trop_high , ci_postop_top_high) %
 
 ci_resp_failure <- resp_failure_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
 coef_resp_failure <- bind_cols(coef_resp_failure, ci_resp_failure) %>% relocate(exploratory_outcomes, .before = Estimate) 
+                                                                                
+ci_ICU <- ICU_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_ICU <- bind_cols(coef_ICU, ci_ICU) %>% relocate(exploratory_outcomes, .before = Estimate)                                                                                 
 
-exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure)
+exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure, coef_ICU)
 exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
 exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
 exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
