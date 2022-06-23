@@ -857,7 +857,7 @@ ci_Stroke <- Stroke_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)
 coef_stroke<- bind_cols(coef_stroke, ci_Stroke) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
 
-exploratory_outcomes_glm <- bind_rows(coef_ICU, coef_AKI, coef_arrythmia , coef_stroke<  )
+exploratory_outcomes_glm <- bind_rows(coef_ICU, coef_AKI, coef_arrythmia , coef_stroke  )
 exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
 exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
 exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
