@@ -2,6 +2,7 @@
 library(lubridate) 
 library(readxl)
 library(magrittr)
+library(tidyverse)
 library(dplyr) 
 library(forcats)
 library(readr)
@@ -699,9 +700,8 @@ myform <- base_form %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
-hosp_proc  %>% analysis_pipe_vu
-hosp_proc  %>% analysis_pipe_cv
-
+analysis_pipe_vu_output <- hosp_proc  %>% analysis_pipe_vu
+analysis_pipe_cv_output <- hosp_proc  %>% analysis_pipe_cv
 
 
 ######### Analysis 1
@@ -819,23 +819,51 @@ myform <- base_form %>%
 
 ## ICU admission
 analysis_pipe <- . %>% mutate(thisout=icu_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
-hosp_proc %>% analysis_pipe
+coef_ICU <- hosp_proc %>% analysis_pipe
+coef_ICU <- coef_ICU %>% add_column(exploratory_outcomes= "ICU")                                                                                
 
 ## AKI
 analysis_pipe <- . %>% mutate(thisout=AKI_v2) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
-hosp_proc %>% analysis_pipe
+coef_AKI <- hosp_proc %>% analysis_pipe
+coef_AKI <- coef_AKI %>% add_column(exploratory_outcomes= "AKI")                                                                                 
 
 ## arrythmia
 analysis_pipe <- . %>% mutate(thisout=AbnormalHeartRythmn) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
-hosp_proc %>% analysis_pipe
+coef_arrythmia <- hosp_proc %>% analysis_pipe
+coef_arrythmia <- coef_arrythmia %>% add_column(exploratory_outcomes= "Arrythmia")                                                                                  
 
 ## stroke
 analysis_pipe <- . %>% mutate(thisout=Stroke) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_stroke<- hosp_proc %>% analysis_pipe
+coef_stroke <- coef_stroke %>% add_column(exploratory_outcomes= "Stroke")   
+                                                                                
+# conference Intervel
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) 
+                                                                                
+ICU_glm <- hosp_proc %>% mutate(thisout= icu_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+ci_ICU <- ICU_glm  %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3) %>% select(-"rname")
+coef_ICU <- bind_cols(coef_ICU, ci_ICU) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
-hosp_proc %>% analysis_pipe
+AKI_glm <- hosp_proc %>% mutate(thisout= AKI_v2) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )                                                                                
+ci_AKI <- AKI_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_AKI <- bind_cols(coef_AKI, ci_AKI) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+AHR_glm <- hosp_proc %>% mutate(thisout= AbnormalHeartRythmn) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )                                                                                
+ci_AHR <- AHR_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_arrythmia  <- bind_cols(coef_arrythmia, ci_AHR) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+Stroke_glm <- hosp_proc %>% mutate(thisout= Stroke) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )                                                                                
+ci_Stroke <- Stroke_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_stroke<- bind_cols(coef_stroke, ci_Stroke) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+
+exploratory_outcomes_glm <- bind_rows(coef_ICU, coef_AKI, coef_arrythmia , coef_stroke<  )
+exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
+exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["97.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm %<>% rename(`p val`= `Pr(>|z|)`)
+exploratory_outcomes_glm[["p val"]] %<>%  round(3) %>% format.pval(eps=.001)                                                                                 
 
 
 saveRDS(hosp_proc, "merged_data.RDS" )
@@ -862,8 +890,9 @@ save( file="cognition_cache.rda" ,
   surg_interact_form ,
   comorbid_form ,
   pretty_names, 
-  analysis_pipe_vu,
-  analysis_pipe_cv
+  analysis_pipe_vu_output ,
+  analysis_pipe_cv_output ,
+  exploratory_outcomes_glm
 )
 
 
