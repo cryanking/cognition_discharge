@@ -391,6 +391,8 @@ encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
 }
 
 actfast_proc_filtered <- bind_cols(actfast_proc_filtered, encode_onehot(actfast_proc_filtered$SurgeryType, colname_prefix="SType_") %>% as_tibble )
+actfast_proc_filtered$year <- format(actfast_proc_filtered$AnestStart, format= "%Y")
+actfast_proc_filtered <- bind_cols(actfast_proc_filtered, encode_onehot(actfast_proc_filtered$year, colname_prefix = "year_") %>% as_tibble)
 
 hosp_proc<- actfast_proc_filtered  %>% group_by(PAN) %>% mutate_at(vars(one_of("Age_at_CPAP"),starts_with("SType_") ), max)  %>%  slice_head( n=1 ) %>% ungroup
 
