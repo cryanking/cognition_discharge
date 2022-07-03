@@ -108,7 +108,7 @@ We found no convincing evidence of heterogeneity by type of surgery, although po
 A forest plot is presented in Figure \@ref(fig:fig1).
 
 ```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals"}
-knitr::include_graphics("/research/forest_home_epic.png")
+knitr::include_graphics("/research/forest_home_epic_surgery.png")
 ```
 
 ## Exploratory clinical outcomes
@@ -130,5 +130,5 @@ print(analysis_pipe_cv_output)
 ```
 
 ```{r figtwo, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by year. Dot = point estimate, lines 95 \\% confidence intervals"}
-knitr::include_graphics("/research/forest_home_epic1.png")
+knitr::include_graphics("/research/forest_home_epic_year.png")
 ```
