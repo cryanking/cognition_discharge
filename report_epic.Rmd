@@ -12,6 +12,7 @@ author:
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
     - \usepackage{colortbl}
+always_allow_html: yes
 ---
 <!-- docker run -v '/mnt/ris/Active/ActFastData/:/research/'  -v '/home//gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report_epic.Rmd")'
 LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/lavanya/gitrepos/cognition_discharge:/script_home/' bsub -G 'compute-christopherking' -n 4 -R 'rusage[mem=15GB] span[hosts=1]' -M 15GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
@@ -30,6 +31,8 @@ library(pROC)
 library("tableone")
 library(knitr)
 library(dplyr)
+#install.packages("webshot")
+#webshot::install_phantomjs()
 #knitr::opts_chunk$set(dev = 'pdf')
 knitr::opts_chunk$set(fig.pos = "!H", out.extra = "")
 merged_data2 <- readRDS("/research/merged_data2.RDS" )
