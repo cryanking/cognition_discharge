@@ -776,7 +776,7 @@ cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 
 temp <- dc_home_glm %>% confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-png(file="forest_home1.png", width=5, height=5, units="in", res=300)
+png(file="forest_home.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
 
