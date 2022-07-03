@@ -670,7 +670,7 @@ cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 
 png(file="forest_home_epic1.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-7, 1), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-4, 1), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR , pos=4)
 # text(x=-15, y=0, labels="Months", pos=4)
