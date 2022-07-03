@@ -1,6 +1,6 @@
 ---
 output: 
-  bookdown::pdf_document2:
+  bookdown::word_document2:
     fig_caption: true
     toc: false
     extra_dependencies: ["amsmath", "colortbl"]
@@ -11,6 +11,7 @@ author:
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
     - \usepackage{colortbl}
+always_allow_html: yes
 ---
 <!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -e 'rmarkdown::render("/code/report.rmd")' --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD)
 
@@ -30,7 +31,8 @@ library(purrr)
 library(pROC)
 library("tableone")
 library(knitr)
-knitr::opts_chunk$set(dev = 'pdf')
+#knitr::opts_chunk$set(dev = 'pdf')
+knitr::opts_chunk$set(fig.pos = "!H", out.extra = "")
 hosp_proc <- readRDS("/research/merged_data.RDS" )
 load(file="/research/cognition_cache.rda")
 swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
@@ -139,4 +141,7 @@ Using the hold-out-sample area under the receiver operating curve concluded that
 print(analysis_pipe_cv_output)
 ```
 
+```{r figtwo, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to other than home with impaired cogition by year. Dot = point estimate, lines 95 \\% confidence intervals"}
 
+knitr::include_graphics("/research/forest_home1.png")
+```
