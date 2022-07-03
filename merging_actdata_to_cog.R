@@ -881,20 +881,14 @@ myform <- base_form %>%
 
 
 dc_home_glm_year <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
-  
 readmit_glm_year <- hosp_proc %>%filter(dc_status=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
-
 death_glm_year <- hosp_proc %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
-  
 los_glm_year <- hosp_proc %>%filter %>% filter(dc_status=="home") %>% mutate(thisout=LoS) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() )
 
 
 coef_home_year <- dc_home_glm_year  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
 coef_readmit_year <-  readmit_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
 coef_death_year <- death_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
 coef_los_year <- los_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
 
 ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% sprintf(fmt="%.2f") %>% paste(collapse=" to ")
@@ -923,8 +917,6 @@ cis_inter_year <- cis_inter_year %>% mutate( YEAR =rname %>% sub(pattern=":.*", 
 
 point_inter_year <- point_inter_year[cis_inter_year%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
-
-temp <- dc_home_glm_year%>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
 png(file="forest_home1.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
