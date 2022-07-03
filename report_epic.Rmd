@@ -99,7 +99,7 @@ merged_data2 %>% select(-c("vats_codes", "ueavfist_codes")) %>% summarize(across
 ```
 
 
-We found that impaired cognition was `r if_else(coef_home[4] < .05, "" ,  "not ")` significantly associated with discharge to home (odds ratio `r paste0(exp(coef_home[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_home)`, p = `r coef_home[4] %>% format.pval(eps=.001, digits=3)`).
+We found that impaired cognition was `r if_else(coef_home[4] < .05, "" ,  "not ")` significantly associated with increased discharge to home (odds ratio `r paste0(exp(coef_home[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_home)`, p = `r coef_home[4] %>% format.pval(eps=.001, digits=3)`).
 For readmission in 30 days, impaired cognition was `r if_else(coef_readmit[4] < .05,"",  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_readmit[2])%>% round(2) %>% sprintf(fmt="%.2f") , ", 95\\% CI ", ci_readmit)`, p = `r coef_readmit[3] %>% format.pval(eps=.001, digits=3)`).
 For near-term death, impaired cognition was `r if_else(coef_death[4] < .05,"",  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_death[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_death)`, p = `r coef_death[4] %>% format.pval(eps=.001, digits=3)`).
 Impaired cognition was `r if_else(coef_los[4] < .05,"",  "not ")` a significant predictor of length of stay (duration ratio `r paste0(exp(coef_los[3])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_los)`, p = `r coef_los[4] %>%  sprintf(fmt="%.3f")`).
