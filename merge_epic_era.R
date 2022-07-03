@@ -273,7 +273,7 @@ figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(in
 
 merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
 
-
+ci
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
@@ -601,6 +601,96 @@ exploratory_outcomes_glm[["97.5 %"]] %<>% exp %>% round(2)
 exploratory_outcomes_glm %<>% rename(`p val`= `Pr(>|z|)`)
 exploratory_outcomes_glm[["p val"]] %<>%  round(3) %>% format.pval(eps=.001)  
 # exploratory_outcomes_glm $`Std. Error` <- round(exploratory_outcomes_glm$`Std. Error`, digits = 2)
+
+
+encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
+  if (!is.factor(x)) {
+      x <- as.factor(x)
+  }
+  encoding_matrix <- contrasts(x, contrasts = FALSE)
+  encoded_data <- encoding_matrix[as.integer(x),]
+  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
+  encoded_data
+}
+
+merged_data2$year <- format(merged_data2$AnestStart, format= "%Y")
+merged_data2 <- bind_cols(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% as_tibble)
+
+base_form <- "thisout ~ 1" %>% formula
+surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
+surg_form <- paste0(surg_vars, collapse=" + ")
+surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
+comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
+year_vars <- colnames(merged_data2) %>% grep(pattern = "year_", value=T)
+year_form <- paste0(year_vars, collapse = " + ")
+year_interact_form <- paste0(year_vars, ":AbnCog" , collapse=" + ")
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" )
+
+
+dc_home_glm_year <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+readmit_glm_year  <- merged_data2 %>%filter(dispo=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+death_glm_year <- merged_data2 %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+los_glm_year <- merged_data2 %>% filter %>% filter(dispo =="home") %>% mutate(thisout=los) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() )
+coef_home_year <- dc_home_glm_year  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_readmit_year <-  readmit_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_death_year <- death_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_los_year <- los_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% sprintf(fmt="%.2f") %>% paste(collapse=" to ")
+
+ci_home_year <- dc_home_glm_year %>% ci_pipe
+ci_readmit_year <- readmit_glm_year %>% ci_pipe
+ci_death_year <- death_glm_year %>% ci_pipe
+ci_los_year <- los_glm_year %>% ci_pipe
+
+
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>% 
+  update( paste0("~.+", year_interact_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) 
+  
+
+inter_glm_year <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% mutate(across(contains("_codes"), as.numeric ) ) %>% glm(data=., formula=myform,  family=binomial() ) 
+
+point_inter_year <-   inter_glm_year %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
+
+cis_inter_year <-inter_glm_year  %>%  confint.default %>% as_tibble(rownames="rname")  %>% filter(grepl(rname, pattern="AbnCog"))
+
+cis_inter_year %<>% mutate(YEAR =rname %>% sub(pattern=":.*", replacement="") )  
+
+point_inter_year <- point_inter_year[cis_inter_year %>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+
+cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+
+png(file="forest_home_epic1.png", width=5, height=5, units="in", res=300)
+par(mar=c(3,0,0,0))
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-7, 1), type='n', axes=FALSE, ylab="", xlab="")
+
+text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR , pos=4)
+# text(x=-15, y=0, labels="Months", pos=4)
+# text(x=seq(from=0, to=60, by=6), y=0, labels=seq(from=0, to=60, by=6), pos=4)
+abline(v=0)
+abline(h=-.1)
+text(x=-6, y=0.2, labels="YEAR", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x=-0, y=0.2, labels="less dc home", pos=4)
+
+points(x=point_inter_year$value, y=-seq.int(nrow(cis_inter_year)), pch=19  )
+arrows(y0=-seq.int(nrow(cis_inter_year)), y1=-seq.int(nrow(cis_inter_year)), x0=cis_inter_year[["2.5 %"]], x1=cis_inter_year[["97.5 %"]]  , length=0)
+
+text(x=-5.9, y=-(nrow(cis_inter_year)+1) , labels = "overall" , pos=4)
+points(x=coef_home_year[2], y=-(nrow(cis_inter_year)+1), pch=19 , col='red')
+arrows(y0=-(nrow(cis_inter_year)+1), y1=-(nrow(cis_inter_year)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
+axis(1, at=-4, labels="odds-ratio", lwd=0)
+dev.off()
+
 
 
 setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               
