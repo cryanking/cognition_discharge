@@ -127,6 +127,6 @@ Using the hold-out-sample area under the receiver operating curve concluded that
 print(analysis_pipe_cv_output)
 ```
 
-```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by year. Dot = point estimate, lines 95 \\% confidence intervals"}
+```{r figtwo, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by year. Dot = point estimate, lines 95 \\% confidence intervals"}
 knitr::include_graphics("/research/forest_home_epic1.png")
 ```
