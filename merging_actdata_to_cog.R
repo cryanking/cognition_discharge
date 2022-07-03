@@ -776,7 +776,7 @@ cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 
 temp <- dc_home_glm %>% confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-png(file="forest_home.png", width=5, height=5, units="in", res=300)
+png(file="forest_home_surgery.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
 
@@ -918,9 +918,9 @@ cis_inter_year <- cis_inter_year %>% mutate( YEAR =rname %>% sub(pattern=":.*", 
 point_inter_year <- point_inter_year[cis_inter_year%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 
-png(file="forest_home1.png", width=5, height=5, units="in", res=300)
+png(file="forest_home_year.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-7, 0), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-7, 0.3), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR , pos=4)
 # text(x=-15, y=0, labels="Months", pos=4)
