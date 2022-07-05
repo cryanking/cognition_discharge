@@ -912,13 +912,14 @@ inter_glm_year <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(Abn
 point_inter_year <-   inter_glm_year %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
   
 cis_inter_year <- inter_glm_year  %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog"))
-
+cis_inter_year <- inner_join(cis_inter_year, point_inter_year %>% select(rname, value), by="rname")
 cis_inter_year <- cis_inter_year %>% mutate( YEAR =rname %>% sub(pattern=":.*", replacement="") )
+                                                                                
 
-point_inter_year <- point_inter_year[cis_inter_year%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+#point_inter_year <- point_inter_year[cis_inter_year%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 #cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 cis_inter_year %<>% arrange(YEAR)                                                                              
-point_inter_year %<>% arrange(YEAR)                                                                              
+                                                                           
 temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
                                                                                 
 png(file="forest_home_year.png", width=5, height=5, units="in", res=300)
@@ -934,7 +935,7 @@ text(x=-6, y=0.2, labels="YEAR", pos=4)
 text(x=-3, y=0.2, labels="more dc home", pos=4)
 text(x=-0, y=0.2, labels="less dc home", pos=4)
 
-points(x=point_inter_year$value, y=-seq.int(nrow(cis_inter_year)), pch=19  )
+points(x=cis_inter_year$value, y=-seq.int(nrow(cis_inter_year)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter_year)), y1=-seq.int(nrow(cis_inter_year)), x0=cis_inter_year[["2.5 %"]], x1=cis_inter_year[["97.5 %"]]  , length=0)
 
 text(x=-5.9, y=-(nrow(cis_inter_year)+1) , labels = "overall" , pos=4)
