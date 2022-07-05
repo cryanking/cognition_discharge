@@ -666,7 +666,7 @@ cis_inter_year %<>% mutate(YEAR =rname %>% sub(pattern=":.*", replacement="") )
 
 point_inter_year <- point_inter_year[cis_inter_year %>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 
-cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+cis_inter_year %<>%  arrange(YEAR)
                                                                                 
 temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
@@ -674,7 +674,7 @@ png(file="forest_home_epic_year.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-4, 0.3), type='n', axes=FALSE, ylab="", xlab="")
 
-text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR , pos=4)
+text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR %>% sub(pattern="year_", replacement="")  , pos=4)
 # text(x=-15, y=0, labels="Months", pos=4)
 # text(x=seq(from=0, to=60, by=6), y=0, labels=seq(from=0, to=60, by=6), pos=4)
 abline(v=0)
