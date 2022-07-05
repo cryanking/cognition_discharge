@@ -918,6 +918,7 @@ cis_inter_year <- cis_inter_year %>% mutate( YEAR =rname %>% sub(pattern=":.*", 
 point_inter_year <- point_inter_year[cis_inter_year%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 #cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 cis_inter_year %<>% arrange(YEAR)                                                                              
+point_inter_year %<>% arrange(YEAR)                                                                              
 temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
                                                                                 
 png(file="forest_home_year.png", width=5, height=5, units="in", res=300)
