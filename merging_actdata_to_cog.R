@@ -917,7 +917,9 @@ cis_inter_year <- cis_inter_year %>% mutate( YEAR =rname %>% sub(pattern=":.*", 
 
 point_inter_year <- point_inter_year[cis_inter_year%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
-
+                                                                                
+temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+                                                                                
 png(file="forest_home_year.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-7, 0.3), type='n', axes=FALSE, ylab="", xlab="")
@@ -936,7 +938,7 @@ arrows(y0=-seq.int(nrow(cis_inter_year)), y1=-seq.int(nrow(cis_inter_year)), x0=
 
 text(x=-5.9, y=-(nrow(cis_inter_year)+1) , labels = "overall" , pos=4)
 points(x=coef_home_year[2], y=-(nrow(cis_inter_year)+1), pch=19 , col='red')
-arrows(y0=-(nrow(cis_inter_year)+1), y1=-(nrow(cis_inter_year)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+arrows(y0=-(nrow(cis_inter_year)+1), y1=-(nrow(cis_inter_year)+1), x0=temp1[["2.5 %"]], x1=temp1[["97.5 %"]]  , length=0, col='red')
 axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
