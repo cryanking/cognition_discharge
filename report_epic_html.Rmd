@@ -1,0 +1,132 @@
+---
+output: 
+    html_document:
+    fig_caption: true
+    toc: false
+    extra_dependencies: ["amsmath", "colortbl"]
+title: "Epic data Results"
+author: 
+ - "C Ryan King, MD PhD"
+ - "Lavanya Pedamallu, PharmD MS"
+ 
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+header-includes:
+    - \usepackage{colortbl}
+---
+<!-- docker run -v '/mnt/ris/Active/ActFastData/:/research/'  -v '/home//gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report_epic.Rmd")'
+LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/lavanya/gitrepos/cognition_discharge:/script_home/' bsub -G 'compute-christopherking' -n 4 -R 'rusage[mem=15GB] span[hosts=1]' -M 15GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
+-->
+```{r setup, include=FALSE}
+library("magrittr")
+library("tidyverse")
+library("rmarkdown")
+library("bookdown")
+library("kableExtra")
+library(splines)
+library(nonnest2)
+library(modelr)
+library(purrr)
+library(pROC)
+library("tableone")
+library(knitr)
+library(dplyr)
+knitr::opts_chunk$set(dev = 'pdf')
+merged_data2 <- readRDS("/research/merged_data2.RDS" )
+load(file="/research/cognition_cache_epic.rda")
+
+
+```
+
+## Methods
+Data from `r  merged_data2 %>% pull("preopdate") %>% min %>% (lubridate::date)` to `r  merged_data2 %>% pull("preopdate") %>% max %>% (lubridate::date)` were queried from the Epic electronic health record.
+Patients were matched to hospital admission, discharge, billing and mortality data.
+Records were filtered to include those with preoperative clinic visits with AD8 or SBT measured, surgery within 90 days of that clinic visit, and matching billing and discharge records.
+A subset of surgical procedures were included into the analytical dataset, procedure codes for which are in the appendix. This restriction was intended to reduce confounding due to surgical complexity.
+That is, we suspect that patients with impaired cognition may be selectively referred to medical vs surgical management of their conditions, and that patients with impaired cogition will be referred for surgeries with less physiologic stress.
+These procedures were felt to be ones with little variation in overall surgical complexity which would contribute to this selection bias.
+
+
+Because our principal outcomes (readmission, discharge to home) and inclusion critereon (procedure codes) are generated at the hospitalization level, we treat that as the unit of analysis.
+Readmission in 30 days and length of stay was only considered for patients with discharge to home.
+
+Association between preoperative cognitive impairment (defined as a Short Blessed Test >= 2 or a AD8 >= 5) and discharge to other than home was assesed using logistic regression models adjusting for surgical procedure type, sex, age using a 5 degree of freedom cublic spline, indicator variables for history of diabetes, chronic kidney disease, chronic obstructive pulmonary disease, CVA(TIA), cancer status, and congestive heart failure.  
+Each hospitalization can have procedures qualifying in multiple categories; we created indicator variables for each procedure category and assumed additivity for hospitalizations with more than one type of procedure. 
+Logisitic regression models with the same adjustment startegy were considered for readmission, near-term death, and exploratory clinical outcomes.
+A log-link generalized linear model (quasipoisson) with the same set of adjusting variables was used for length of stay.
+
+Heterogeneity of association between abnormal cognition and outcomes was assessed using an expanded model with an interaction term and a score-test. 
+To compare the predictive value of AD8 or SBT, we used two approaches.
+First, we used a k-fold cross-validation method (K=100) fitting logistic regression models predicting each outcome using AD8 or SBT, then assessing the accuracy by area under the receiver operating characteristic curve in the hold-out sample. Each 100 pairs of accuracy metrics are then compared by a paired t-test.
+Second, we used the Vuong test for non-nested models [https://doi.org/10.2307/1912557](https://doi.org/10.2307/1912557) implemented by the "nonnest2" package version 0.5-5.
+
+All analysis was conducted using R 4.1.2. A repository containing the analysis code is available at [https://github.com/cryanking/cognition_discharge](https://github.com/cryanking/cognition_discharge)
+
+
+## Results
+The filtered dataset included `r merged_data2 %>% pull("CSN") %>% n_distinct` distinct patients with `r merged_data2 %>% pull("orlogid") %>% n_distinct` hospitalizations. 
+Characteristics of the cohort and overall outcome rates are given in Table \@ref(tab:desc).
+AD8 was abnormal (>=2) in `r merged_data2$AD8 %>% is_greater_than(2) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients; SBT was abnormal (>=5) in `r merged_data2$SBT %>% is_greater_than(5) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients.
+
+```{r tableone, echo=FALSE, messages=FALSE}
+factor_vars<- c('Sex' , 'RACE' , "CAD", "CHF", "Diabetes", "COPD", "CKD" , "CVA(TIA)",   "cancerStatus")
+outcome_factors<- c("dc_home" , "readmit", "death", "ICU" )
+outcome_con <- "los"
+con_vars <- c( 'age' )
+
+merged_data2 %>% 
+mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "impaired cognition")  ) ) %>%
+ CreateTableOne(vars = c(factor_vars , con_vars, outcome_factors, outcome_con ) , strata = "AbnCog" , data = .   , factorVars = c(factor_vars, outcome_factors) ,includeNA = FALSE, test=TRUE) -> tab3
+
+ temp <- capture.output(x <- print(tab3 , showAllLevels = FALSE, contDigits=0, printToggle=FALSE, nonnormal=TRUE, exact=T))
+
+ rownames(x) <- rownames(x) %>% sub(pattern="= 1 (", replacement="(", fixed=T) %>% sub(pattern="= TRUE (", replacement="(", fixed=T)
+
+ x <- x[,setdiff(colnames(x), "test")]
+table_1_format <- kbl(x, longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, CHF = Congestive heart failure,  Diabetes = Diabetes mellitus,  COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA\\ (TIA\\ ) = history of stroke or transient ischemic attack,  dc\\_home = discharge to home, readmit  = readmission within 30 days, los = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
+kable_styling(latex_options =c("striped") ) %>%
+  add_indent( grep(rownames(x), pattern="^\\s+" ) )
+# %>% 
+# pack_rows("Baseline Characteristics", 2,7) %>% pack_rows("Outcomes", 8,27) 
+#ASA = American Society of Anesthesiologists Physical Status,
+table_1_format
+```
+
+The frequency of each type of surgery is displayed in Table \@ref(tab:descType). The frequencies do not add up to the number of hospitalizations because of multiple procedures per hospitalization.
+```{r tabletwo, echo=FALSE, messages=FALSE, results='asis'}
+merged_data2 %>% select(-c("vats_codes", "ueavfist_codes")) %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery Type', 'N')) %>% arrange(N)%>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
+```
+
+
+We found that impaired cognition was `r if_else(coef_home[4] < .05, "" ,  "not ")` significantly associated with increased discharge to home (odds ratio `r paste0(exp(coef_home[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_home)`, p = `r coef_home[4] %>% format.pval(eps=.001, digits=3)`).
+For readmission in 30 days, impaired cognition was `r if_else(coef_readmit[4] < .05,"",  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_readmit[2])%>% round(2) %>% sprintf(fmt="%.2f") , ", 95\\% CI ", ci_readmit)`, p = `r coef_readmit[3] %>% format.pval(eps=.001, digits=3)`).
+For near-term death, impaired cognition was `r if_else(coef_death[4] < .05,"",  "not ")` a significant predictor (odds ratio `r paste0(exp(coef_death[2])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_death)`, p = `r coef_death[4] %>% format.pval(eps=.001, digits=3)`).
+Impaired cognition was `r if_else(coef_los[4] < .05,"",  "not ")` a significant predictor of length of stay (duration ratio `r paste0(exp(coef_los[3])%>% round(2) %>% sprintf(fmt="%.2f"), ", 95\\% CI ", ci_los)`, p = `r coef_los[4] %>%  sprintf(fmt="%.3f")`).
+
+We found no convincing evidence of heterogeneity by type of surgery, although power for this question is limited by small sample sizes in some surgery types. A score test comparing models with and without interaction terms yielded a p-value of `r anova(inter_glm, dc_home_glm, test="Rao")  %>% select(starts_with("Pr"))  %>% extract2(2,1) %>% sprintf(fmt="%.3f")`
+A forest plot is presented in Figure \@ref(fig:fig1).
+
+```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals"}
+knitr::include_graphics("/research/forest_home_epic_surgery.png")
+```
+
+## Exploratory clinical outcomes
+Results from logistic regression models predicting pneumonia (PNA), incident Atrial Fibrilation (AF), AKI worse than grade 1, incident stroke or TIA (CVA), ICU, elevated postop troponin, and intubation longer than 12 hours are given in Table \@ref(tab:GLM2). 
+```{r tablethree, echo=FALSE, messages=FALSE, results='asis'}
+exploratory_outcomes_glm  %>% kbl( caption="\\label{tab:GLM2}GLM results for exploratory outcomes. Odds ratios, 95\\% confidence intervals, and p-values.")
+```
+
+We found that the Vuong test of model superiority for predicting discharge location with AD8 vs SBT was `r if_else(analysis_pipe_vu_output$p_LRT %>% unlist %>% min %>% is_less_than(.05), "" ,  "not ")` significant with the minimum p value `r analysis_pipe_vu_output$p_LRT%>% unlist %>% min %>% round(3) %>% format.pval(eps=.001)  `. 
+
+```{r tablefour, echo=FALSE}
+print(analysis_pipe_vu_output)
+```
+
+Using the hold-out-sample area under the receiver operating curve concluded that there was `r if_else(analysis_pipe_cv_output$p.value %>% is_less_than(.05), "" ,  "no ")` significant difference using SBT versus AD8. The mean AUROC estimates were `r analysis_pipe_cv_output$estimate %>% unname %>% round(3) %>% formatC( format='f', digits=3 ) %>% paste(collapse=" and ")` respectively with a p value of `r analysis_pipe_cv_output$p.value%>% round(3) %>% format.pval(eps=.001)  `.
+
+```{r tablefive, echo=FALSE}
+print(analysis_pipe_cv_output)
+```
+
+```{r figtwo, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to home with impaired cogition by year. Dot = point estimate, lines 95 \\% confidence intervals"}
+knitr::include_graphics("/research/forest_home_epic_year.png")
+```
