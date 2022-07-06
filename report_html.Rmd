@@ -1,6 +1,6 @@
 ---
 output: 
-  bookdown::html_document:
+    html_document:
     fig_caption: true
     toc: false
     extra_dependencies: ["amsmath", "colortbl"]
