@@ -1,6 +1,6 @@
 ---
 output: 
-  bookdown::pdf_document2:
+  bookdown::html_document:
     fig_caption: true
     toc: false
     extra_dependencies: ["amsmath", "colortbl"]
@@ -67,7 +67,7 @@ The filtered dataset included `r merged_data2 %>% pull("CSN") %>% n_distinct` di
 Characteristics of the cohort and overall outcome rates are given in Table \@ref(tab:desc).
 AD8 was abnormal (>=2) in `r merged_data2$AD8 %>% is_greater_than(2) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients; SBT was abnormal (>=5) in `r merged_data2$SBT %>% is_greater_than(5) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients.
 
-```{r tableone, echo=FALSE, messages=FALSE, results='asis'}
+```{r tableone, echo=FALSE, messages=FALSE}
 factor_vars<- c('Sex' , 'RACE' , "CAD", "CHF", "Diabetes", "COPD", "CKD" , "CVA(TIA)",   "cancerStatus")
 outcome_factors<- c("dc_home" , "readmit", "death", "ICU" )
 outcome_con <- "los"
