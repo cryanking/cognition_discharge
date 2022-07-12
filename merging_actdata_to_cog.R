@@ -921,6 +921,8 @@ cis_inter_year <- cis_inter_year %>% mutate( YEAR =rname %>% sub(pattern=":.*", 
 cis_inter_year %<>% arrange(YEAR)                                                                              
                                                                            
 temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+
+cis_inter_year %<>%  bind_rows( data.frame(value=coef_home_year[2], `97.5 %`=temp1[["97.5 %"]], `2.5 %`=temp1[["2.5 %"]], YEAR="All Pre-Epic"  ) )
                                                                                 
 png(file="forest_home_year.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
@@ -974,7 +976,8 @@ save( file="cognition_cache.rda" ,
   pretty_names, 
   analysis_pipe_vu_output ,
   analysis_pipe_cv_output ,
-  exploratory_outcomes_glm
+  exploratory_outcomes_glm ,
+  cis_inter_year
 )
 
 
