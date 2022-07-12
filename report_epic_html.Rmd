@@ -13,7 +13,7 @@ date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
     - \usepackage{colortbl}
 ---
-<!-- docker run -v '/mnt/ris/Active/ActFastData/:/research/'  -v '/home//gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report_epic.Rmd")'
+<!-- docker run -v '/mnt/ris/Active/ActFastData/:/research/'  -v '/home/cognition_discharge/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report_epic.Rmd")'
 LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/lavanya/gitrepos/cognition_discharge:/script_home/' bsub -G 'compute-christopherking' -n 4 -R 'rusage[mem=15GB] span[hosts=1]' -M 15GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
 -->
 ```{r setup, include=FALSE}
@@ -33,6 +33,28 @@ library(dplyr)
 knitr::opts_chunk$set(dev = 'pdf')
 merged_data2 <- readRDS("/research/merged_data2.RDS" )
 load(file="/research/cognition_cache_epic.rda")
+# cis_inter_year %>% mutate( value = if_else(YEAR=="All Epic", Estimate, value ) , `2.5 %`  )
+cis_inter_year %<>% mutate( value = coalesce(Estimate, value ) , `2.5 %`= coalesce(`2.5 %`, X2.5..), `97.5 %`= coalesce(`97.5 %`, X97.5..)  ) %>% select(YEAR, value, `2.5 %`, `97.5 %`)
+
+
+pre_epic_data <- new.env()
+load(file="/research/cognition_cache.rda", envir=pre_epic_data)
+pre_epic_data$cis_inter_year %<>% mutate( value = coalesce(Estimate, value ) , `2.5 %`= coalesce(`2.5 %`, X2.5..), `97.5 %`= coalesce(`97.5 %`, X97.5..)  ) %>% select(YEAR, value, `2.5 %`, `97.5 %`)
+
+cis_inter_year %<>% bind_rows(pre_epic_data$cis_inter_year)
+
+figure1 %<>% select(-deltaN) %>% rename(N_Epic = N)
+figure1[["N_pre_Epic"]] <- pre_epic_data$figure1$N
+
+combine_models <- function(model1, model2) {
+  w <- c( model1[["Std. Error"]], model2[["Std. Error"]])^(-2)
+  se <- 1./sqrt(sum(w) )
+  w <- w/sum(w)
+  est = sum(w*c( model1[["Estimate"]], model2[["Estimate"]]) )
+  return( c(value=est, `2.5 %`=est+qnorm(0.025)*se , `97.5 %`=est+qnorm(0.975)*se ) )
+}
+
+cis_inter_year %<>% bind_rows( data.frame(as.list(combine_models(coef_home, pre_epic_data$coef_home)), check.names=FALSE) %>% cbind(data.frame(YEAR="All data")) )
 
 
 ```
@@ -64,6 +86,12 @@ All analysis was conducted using R 4.1.2. A repository containing the analysis c
 
 ## Results
 The filtered dataset included `r merged_data2 %>% pull("CSN") %>% n_distinct` distinct patients with `r merged_data2 %>% pull("orlogid") %>% n_distinct` hospitalizations. 
+
+```{r tableonea, echo=FALSE, messages=FALSE}
+figure1[,c("Stage", "N")] %>% kbl(caption="\\label{tab:fig1}Patient inclusion flow") %>% 
+kable_styling(latex_options =c("striped") )
+```
+
 Characteristics of the cohort and overall outcome rates are given in Table \@ref(tab:desc).
 AD8 was abnormal (>=2) in `r merged_data2$AD8 %>% is_greater_than(2) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients; SBT was abnormal (>=5) in `r merged_data2$SBT %>% is_greater_than(5) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients.
 
