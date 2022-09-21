@@ -114,9 +114,9 @@ cog_dates <- cog_dates[MEASURE_NAME %chin% c("Short Blessed Total Score" , "AD8 
 
 
 ## filter to just the variables of interest
-merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
+merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score`, low_barthel=`Barthel index score`<100 ) ] %>% 
 merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>%
-merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" )
+merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) ) ] , by="orlogid" )
 ## i merge the discharge dates later, will transform the death dates to an outcome then
 merged_data <- merged_data[age>=64.5]
 
@@ -273,7 +273,6 @@ figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(in
 
 merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
 
-ci
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
@@ -348,7 +347,7 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 
 # setDF(merged_data2)                                                                                
 merged_data2$RACE %<>% as.character
-merged_data2$RACE %<>% as.factor %>% fct_other(keep=c("-1", "0", "1", "2", "3")) %>% fct_recode(White = "0", Black = "1", Other = "-1", Asian = "2", other_pacific_islands = "3") %>% fct_explicit_na                                                                                
+merged_data2$RACE %<>% as.factor %>% fct_other(keep=c("0", "1" )) %>% fct_recode(White = "0", Black = "1") %>% fct_explicit_na("Other")                                                                                
 merged_data2$cancerStatus %<>% as.character                                                                                
 merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4")) %>% fct_recode(`Metastatic Cancer` = "4", `Skin Cancer` = "0", `in remission/radiation/chemo`= "2", `Current Cancer` = "3") %>% fct_explicit_na
 # setDT(merged_data2)                                                                               
