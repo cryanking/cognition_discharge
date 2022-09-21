@@ -1,11 +1,20 @@
-# docker run -it --rm -v "/mnt/ris/ActFastData/:/research/"  cryanking/verse_plus R  
+# docker run -v "/mnt/ris/ActFastData/:/research/" -v "/home/christopherking/gitdirs/cognition_discharge:/code" -v "/mnt/ris/lavanya/cognition_check/:/output" cryanking/cognitioncheck:1.1 R  -f /code/merge_epic_era.R
 
-## TODO: import exploratory outcomes
-## TODO: code import analysis of outcomes -> cache
+#LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/ActFastData/:/research/  /storage1/fs1/christopherking/Active/lavanya/cognition_check/:/output/ /home/lavanya/gitrepos/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=32GB] span[hosts=1]' -M 32GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
+#Digest: sha256:9b99f73d209fb61e18cd4829f7b01c039b6645484dd1c4fa79a20d7d809b7f1d
 
 library(data.table)
 library(lubridate)
 library(magrittr)
+library(purrr)
+library(splines)
+library(pROC)
+library(tidyverse)
+library(dplyr)  
+library(splines)
+library(nonnest2)
+
+
 clarity_root <- '/research/ActFast_Epic_Flow/Data 202004/Clarity data/'
 
 ## AD8, SBT pre-processed in main actfast
@@ -22,6 +31,16 @@ death_outcomes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 2.csv
 preop_covariates <- merge(death_outcomes, preop_covariates, by.y="CurrentMRN", by.x="Patient Primary MRN", all.y=T)
 
 procedure_codes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 4.csv', sep=";" )
+
+merged_post <- fread( "/research/Actfast_deident_epic/epic_outcomes.csv" )
+matching_ids <- fread( "/research/Actfast_reident_epic/epic_orlogid_codes.csv" )
+setnames(merged_post, "orlogid", "orlogid_encoded")
+
+exploratory_outcomes <- matching_ids[ , .(orlogid,orlogid_encoded) ][merged_post[ , .(orlogid_encoded, PNA, AF, post_aki_status, CVA, postop_trop_high, postop_vent_duration ) ] , on="orlogid_encoded"]
+exploratory_outcomes[, orlogid_encoded:= NULL]
+exploratory_outcomes[ ,post_aki_status := post_aki_status >= 2 ]
+exploratory_outcomes[ ,resp_failure := fcase( is.na(postop_vent_duration), FALSE, postop_vent_duration < 1, FALSE, default=TRUE) ]
+exploratory_outcomes[, postop_vent_duration:= NULL]
 
 ## admission data to get discharge times
 epic_admits <- fread(paste0(clarity_root , 'Clarity Hogue Result Set ADT.csv'))
@@ -95,9 +114,9 @@ cog_dates <- cog_dates[MEASURE_NAME %chin% c("Short Blessed Total Score" , "AD8 
 
 
 ## filter to just the variables of interest
-merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score` ) ] %>% 
+merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score`, low_barthel=`Barthel index score`<100 ) ] %>% 
 merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>%
-merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes ) ] , by="orlogid" )
+merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) , HTN) ] , by="orlogid" )
 ## i merge the discharge dates later, will transform the death dates to an outcome then
 merged_data <- merged_data[age>=64.5]
 
@@ -254,7 +273,6 @@ figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(in
 
 merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
 
-
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
@@ -303,7 +321,16 @@ merged_data2 %<>% merge(los_data, all.x=TRUE, by="orlogid")
 ## fixing up the death events as promised above
 merged_data2[, CSN:=as.character(CSN)]
 my_visits[, CSN:=as.character(CSN)]
-merged_data2 <- merge(merged_data2, my_visits, by="CSN", all.x=TRUE, all.y=FALSE)
+# merged_data2 <- merge(merged_data2, my_visits, by="CSN", all.x=TRUE, all.y=FALSE)
+
+testing_data2<- merge(merged_data2[, .(orlogid, AnestStart)] , my_visits[, .(orlogid, dist)], by="orlogid", all.x=TRUE, all.y=FALSE, allow.cartesian=TRUE)
+
+testing_data2 <- testing_data2[ dist > AnestStart]
+testing_data2 <- testing_data2[ , .(dist=min(dist))  , by="orlogid" ]
+
+merged_data2 <- merge(merged_data2, testing_data2 , by="orlogid", all.x=TRUE, all.y=FALSE)
+
+
 merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < dist + ddays(30), TRUE, default=FALSE) ]
 
 merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum) -> code_counts
@@ -318,12 +345,22 @@ merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_co
 #                 92                  7                 49 
 
 
+# setDF(merged_data2)                                                                                
+merged_data2$RACE %<>% as.character
+merged_data2$RACE %<>% as.factor %>% fct_other(keep=c("0", "1" )) %>% fct_recode(White = "0", Black = "1") %>% fct_explicit_na("Other")                                                                                
+merged_data2$cancerStatus %<>% as.character                                                                                
+merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4")) %>% fct_recode(`Metastatic Cancer` = "4", `Skin Cancer` = "0", `in remission/radiation/chemo`= "2", `Current Cancer` = "3") %>% fct_explicit_na
+# setDT(merged_data2)                                                                               
 
+merged_data2 <- merge(merged_data2, exploratory_outcomes, by = "orlogid", all.x=TRUE)
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
 
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
-  
+
+swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
+
+
 comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
 
 
@@ -343,8 +380,8 @@ myform <- base_form %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+bs(age, 5)" ) 
 
-library(dplyr)  
-library(splines)
+
+
 ## surgery effects
 
 analysis_pipe <- . %>% mutate(thisout=dc_home) %>% mutate(across(contains("_codes"), as.numeric)) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
@@ -361,10 +398,338 @@ analysis_pipe <- . %>% mutate(thisout=dc_home)%>% mutate(across(contains("_codes
 
 merged_data2 %>% analysis_pipe
 
+
+if(TRUE) {
+analysis_pipe_vu <- function(x) {
+g1 <- x %>% mutate(thisout=dispo!="home") %>% filter(!is.na(SBT) & ! is.na(AD8) )%>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g2 <- x %>% mutate(thisout=dispo!="home") %>% filter(!is.na(SBT) & ! is.na(AD8) )%>%mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
+vuongtest(g1, g2)
+}
+
+
+analysis_pipe_cv <- function(x) {
+
+  x2 <- x %>% mutate(thisout=dispo!="home")
+  rs <- modelr::crossv_kfold(x2, k=100)
+  r1 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
+    map2_dbl(rs$test, function(.x, .y){
+      response <- .y %>% as.data.frame %>% pull("thisout")
+      if(n_distinct(response) > 1 ) {
+        pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) )  ) %>% auc } else {NA_real_}
+    } )
+
+  r2 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
+    response <- .y %>% as.data.frame %>% pull("thisout")
+    if(n_distinct(response) > 1 ) {
+      pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) )  ) %>% auc } else {NA_real_}
+  } )
+  t.test(na.omit(r1), na.omit(r2) )
+}
+
+global_age_spline <- bs(merged_data2$age, 3)
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) 
+merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_cv
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,age)" ) 
+merged_data2  %>% analysis_pipe_vu
+merged_data2  %>% analysis_pipe_cv
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,age)" ) 
+analysis_pipe_vu_output <- merged_data2  %>% analysis_pipe_vu
+analysis_pipe_cv_output <- merged_data2  %>% analysis_pipe_cv
+}
+
+myform <- base_form %>%
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+bs(age, 5)" )
+
+dc_home_glm <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+readmit_glm  <- merged_data2 %>%filter(dispo=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+death_glm <- merged_data2 %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+los_glm <- merged_data2 %>% filter %>% filter(dispo =="home") %>% mutate(thisout=los) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() )
+coef_home <- dc_home_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_readmit <-  readmit_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_death <- death_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_los <- los_glm %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% sprintf(fmt="%.2f") %>% paste(collapse=" to ")
+
+ci_home <- dc_home_glm %>% ci_pipe
+ci_readmit <- readmit_glm %>% ci_pipe
+ci_death <- death_glm %>% ci_pipe
+ci_los <- los_glm %>% ci_pipe
+
+
+base_form <- "thisout ~ 1" %>% formula
+surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
+surg_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ) , collapse=" + ")
+surg_interact_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ),":AbnCog" ,  collapse=" + ")
+comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
   update( paste0("~.+", surg_interact_form) ) %>%
   update( paste0("~.+", comorbid_form) ) %>%
-  update( "~.+bs(age, 5)" ) 
-merged_data2 %>% analysis_pipe
+  update( "~.+bs(age, 5)" )
+  
+  
+inter_glm <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% mutate(across(contains("_codes"), as.numeric ) ) %>% glm(data=., formula=myform,  family=binomial() ) 
+
+point_inter <-   inter_glm %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
+
+cis_inter <-inter_glm  %>%  confint.default %>% as_tibble(rownames="rname")  %>% filter(grepl(rname, pattern="AbnCog"))
+
+cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") )  %>% swap_pretty_names
+
+point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+
+cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+
+temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+
+setwd("/output/")
+png(file="forest_home_epic_surgery.png", width=7, height=5, units="in", res=300)
+par(mar=c(3,0,0,0))
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-14, 0), type='n', axes=FALSE, ylab="", xlab="")
+
+text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
+abline(v=0)
+abline(h=-.1)
+text(x=-6, y=0.2, labels="Surgery type", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x= 0, y=0.2, labels="less dc home", pos=4)
+
+points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
+arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
+
+text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
+points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
+arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
+axis(1, at=-4, labels="odds-ratio", lwd=0)
+dev.off()
+
+anova(inter_glm, dc_home_glm, test="Rao")
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", surg_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,age)" ) 
+
+
+# exploratory outcomes
+
+# CVA
+CVA_glm <- merged_data2 %>% mutate(thisout=CVA) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_CVA <- CVA_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_CVA <- coef_CVA %>% add_column(exploratory_outcomes= "CVA")
+
+# AF
+AF_glm <- merged_data2 %>% mutate(thisout=AF) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_AF <- AF_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)  
+coef_AF <- coef_AF %>% add_column(exploratory_outcomes= "AF")
+
+# PNA
+PNA_glm <- merged_data2 %>% mutate(thisout=PNA) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_PNA <- PNA_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_PNA <- coef_PNA %>% add_column(exploratory_outcomes= "PNA")
+
+# post_aki_status
+post_AKI_glm <- merged_data2 %>% mutate(thisout=post_aki_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_post_AKI <- post_AKI_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_post_AKI <- coef_post_AKI %>% add_column(exploratory_outcomes= "post_aki_status")
+
+# postop_top_high
+postop_top_high_glm <- merged_data2 %>% mutate(thisout=postop_trop_high) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_postop_trop_high <- postop_top_high_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_postop_trop_high <- coef_postop_trop_high %>% add_column(exploratory_outcomes= "post_trop_high")
+
+# resp_failure
+resp_failure_glm <- merged_data2 %>% mutate(thisout=resp_failure) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_resp_failure <- resp_failure_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_resp_failure <- coef_resp_failure  %>% add_column(exploratory_outcomes= "resp_failure")
+
+# ICU
+ICU_glm <- merged_data2 %>% mutate(thisout=ICU) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+coef_ICU <- ICU_glm  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`) 
+coef_ICU <- coef_ICU  %>% add_column(exploratory_outcomes= "ICU")                                                                                
+                                                                                
+# conference Intervel
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) 
+
+ci_CVA <- CVA_glm  %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3) %>% select(-"rname")
+coef_CVA <- bind_cols(coef_CVA, ci_CVA) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+ci_AF <- AF_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_AF <- bind_cols(coef_AF, ci_AF) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+ci_PNA <- PNA_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_PNA <- bind_cols(coef_PNA, ci_PNA) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+ci_AKI <- post_AKI_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_post_AKI<- bind_cols(coef_post_AKI, ci_AKI) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+ci_postop_top_high <- postop_top_high_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_postop_trop_high <- bind_cols(coef_postop_trop_high , ci_postop_top_high) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+ci_resp_failure <- resp_failure_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_resp_failure <- bind_cols(coef_resp_failure, ci_resp_failure) %>% relocate(exploratory_outcomes, .before = Estimate) 
+                                                                                
+ci_ICU <- ICU_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_ICU <- bind_cols(coef_ICU, ci_ICU) %>% relocate(exploratory_outcomes, .before = Estimate)                                                                                 
+
+exploratory_outcomes_glm <- bind_rows(coef_CVA, coef_PNA, coef_AF, coef_post_AKI, coef_postop_trop_high , coef_resp_failure, coef_ICU)
+exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
+exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["97.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm %<>% rename(`p val`= `Pr(>|z|)`)
+exploratory_outcomes_glm[["p val"]] %<>%  round(3) %>% format.pval(eps=.001)  
+# exploratory_outcomes_glm $`Std. Error` <- round(exploratory_outcomes_glm$`Std. Error`, digits = 2)
+
+
+encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
+  if (!is.factor(x)) {
+      x <- as.factor(x)
+  }
+  encoding_matrix <- contrasts(x, contrasts = FALSE)
+  encoded_data <- encoding_matrix[as.integer(x),]
+  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
+  encoded_data
+}
+
+merged_data2$year <- format(merged_data2$AnestStart, format= "%Y")
+merged_data2 <- bind_cols(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% as_tibble)
+
+base_form <- "thisout ~ 1" %>% formula
+surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
+surg_form <- paste0(surg_vars, collapse=" + ")
+surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
+comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
+year_vars <- colnames(merged_data2) %>% grep(pattern = "year_", value=T)
+year_form <- paste0(year_vars, collapse = " + ")
+year_interact_form <- paste0(year_vars, ":AbnCog" , collapse=" + ")
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" )
+
+
+dc_home_glm_year <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+readmit_glm_year  <- merged_data2 %>%filter(dispo=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+death_glm_year <- merged_data2 %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+los_glm_year <- merged_data2 %>% filter %>% filter(dispo =="home") %>% mutate(thisout=los) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() )
+coef_home_year <- dc_home_glm_year  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_readmit_year <-  readmit_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_death_year <- death_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_los_year <- los_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% sprintf(fmt="%.2f") %>% paste(collapse=" to ")
+
+ci_home_year <- dc_home_glm_year %>% ci_pipe
+ci_readmit_year <- readmit_glm_year %>% ci_pipe
+ci_death_year <- death_glm_year %>% ci_pipe
+ci_los_year <- los_glm_year %>% ci_pipe
+
+
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>% 
+  update( paste0("~.+", year_interact_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) 
+  
+
+inter_glm_year <- merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% mutate(across(contains("_codes"), as.numeric ) ) %>% glm(data=., formula=myform,  family=binomial() ) 
+
+point_inter_year <-   inter_glm_year %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
+
+cis_inter_year <-inter_glm_year  %>%  confint.default %>% as_tibble(rownames="rname")  %>% filter(grepl(rname, pattern="AbnCog"))
+
+cis_inter_year <- inner_join(cis_inter_year, point_inter_year %>% select(rname, value), by="rname")
+                                                                                
+                                                                                
+cis_inter_year %<>% mutate(YEAR =rname %>% sub(pattern=":.*", replacement="") )  
+
+#point_inter_year <- point_inter_year[cis_inter_year %>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+
+#point_inter_year %<>%  arrange(YEAR)
+cis_inter_year %<>%  arrange(YEAR)           
+           
+temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+
+cis_inter_year %<>%  bind_rows( data.frame(value=coef_home_year[2], `97.5 %`=temp1[["97.5 %"]], `2.5 %`=temp1[["2.5 %"]], YEAR="All Epic"  ) )
+
+png(file="forest_home_epic_year.png", width=5, height=5, units="in", res=300)
+par(mar=c(3,0,0,0))
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-4, 0.3), type='n', axes=FALSE, ylab="", xlab="")
+
+text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR %>% sub(pattern="year_", replacement="")  , pos=4)
+# text(x=-15, y=0, labels="Months", pos=4)
+# text(x=seq(from=0, to=60, by=6), y=0, labels=seq(from=0, to=60, by=6), pos=4)
+abline(v=0)
+abline(h=-.1)
+text(x=-6, y=0.2, labels="YEAR", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x=-0, y=0.2, labels="less dc home", pos=4)
+
+points(x=cis_inter_year$value, y=-seq.int(nrow(cis_inter_year)), pch=19  )
+arrows(y0=-seq.int(nrow(cis_inter_year)), y1=-seq.int(nrow(cis_inter_year)), x0=cis_inter_year[["2.5 %"]], x1=cis_inter_year[["97.5 %"]]  , length=0)
+
+text(x=-5.9, y=-(nrow(cis_inter_year)+1) , labels = "overall" , pos=4)
+points(x=coef_home_year[2], y=-(nrow(cis_inter_year)+1), pch=19 , col='red')
+arrows(y0=-(nrow(cis_inter_year)+1), y1=-(nrow(cis_inter_year)+1), x0=temp1[["2.5 %"]], x1=temp1[["97.5 %"]]  , length=0, col='red')
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
+axis(1, at=-4, labels="odds-ratio", lwd=0)
+dev.off()
+
+
+
+setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               
+saveRDS(merged_data2, "merged_data2.RDS" )
+save( file="cognition_cache_epic.rda" ,
+  figure1,
+  dc_home_glm ,
+  readmit_glm ,
+  death_glm,
+  los_glm,
+  inter_glm, 
+  coef_home,
+  coef_readmit,
+  coef_death,
+  coef_los,
+  ci_home ,
+  ci_readmit ,
+  ci_death ,
+  ci_los ,
+  comborbid_vars ,
+  base_form ,
+  surg_vars ,
+  surg_form ,
+  surg_interact_form ,
+  comorbid_form ,
+  pretty_names,
+  swap_pretty_names,
+  analysis_pipe_vu_output,
+  analysis_pipe_cv_output,
+  exploratory_outcomes_glm ,
+  cis_inter_year
+  )
+
+
 

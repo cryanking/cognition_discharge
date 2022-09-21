@@ -2,6 +2,7 @@
 library(lubridate) 
 library(readxl)
 library(magrittr)
+library(tidyverse)
 library(dplyr) 
 library(forcats)
 library(readr)
@@ -74,7 +75,7 @@ TextSignals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
 TextSignals %<>% select(one_of("CPAPPatientID", "Sex", "Race", "Ethnicity", "Alcohol use", "Drinks/week", "Functional capacity", "Dialysis history", "Cirrhosis etiology", "Surgical Service") )
 
 TextSignals %<>% (janitor::clean_names)
-TextSignals$race %<>% as.factor %>% fct_other(keep=c("7","9")) %>% fct_recode(White="9", Black="7") %>% fct_explicit_na("Missing") %>% relevel(ref="White")
+TextSignals$race %<>% as.factor %>% fct_other(keep=c("7","9")) %>% fct_recode(White="9", Black="7") %>% fct_explicit_na("Other") %>% relevel(ref="White") 
 
 ## the base package ifelse doesn't check type consistency, which is a frequent source of difficult to detect bugs. use if_else (in tidyverse or fifelse in data.table)
 TextSignals %<>% mutate(current_heavy = if_else(sex==1, drinks_week > 16, drinks_week >10)%>% as.factor %>% fct_explicit_na ) %>% select(-one_of("drinks_week"))
@@ -365,10 +366,12 @@ actfast_proc_filtered %<>%  mutate(SurgeryType = make_surg_categories(ICDX_PROCE
 ## replace NA with 0 in comorbidities and transform them to binary
 na_zero <- function(x) {  if_else(is.na(x), 0, x) }
 # comborbid_vars <- c("Coronary artery disease", "Congestive heart failure", "Atrial fibrillation or flutter history" , "COPD" , "Asthma" , "Peripheral artery disease" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA" ,"Hypertension")
-comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA" )
+comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA")
 
-actfast_proc_filtered %<>%  mutate_at(vars(one_of(comborbid_vars)) , na_zero) %>% mutate_at(vars(one_of(comborbid_vars)) , as.logical) %>% mutate(CVA = `Cerebrovascular disease` | `Cerebrovascular disease, stroke, or TIA` | CVA | TIA) 
+actfast_proc_filtered %<>%  mutate_at(vars(one_of(comborbid_vars)) , na_zero) %>% mutate_at(vars(one_of(comborbid_vars)) , as.logical) %>% mutate(CVA = `Cerebrovascular disease` | `Cerebrovascular disease, stroke, or TIA` | CVA | TIA) %>% mutate_at(vars(one_of( c("Hypertension", "Coronary artery disease", "Atrial fibrillation or flutter history","Chronic kidney disease") )), na_zero )
 
+
+ 
 
 ## transform each hospitalization - 2733 hospitalizations
 
@@ -390,6 +393,8 @@ encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
 }
 
 actfast_proc_filtered <- bind_cols(actfast_proc_filtered, encode_onehot(actfast_proc_filtered$SurgeryType, colname_prefix="SType_") %>% as_tibble )
+actfast_proc_filtered$year <- format(actfast_proc_filtered$AnestStart, format= "%Y")
+actfast_proc_filtered <- bind_cols(actfast_proc_filtered, encode_onehot(actfast_proc_filtered$year, colname_prefix = "year_") %>% as_tibble)
 
 hosp_proc<- actfast_proc_filtered  %>% group_by(PAN) %>% mutate_at(vars(one_of("Age_at_CPAP"),starts_with("SType_") ), max)  %>%  slice_head( n=1 ) %>% ungroup
 
@@ -444,11 +449,15 @@ analysis_pipe <- . %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.n
 
 ## surgery specific effects - build formulas externally because of the non-factor structure
 ## save these building blocks for various models
+## year specific included
 base_form <- "thisout ~ 0" %>% formula
 surg_vars <- colnames(hosp_proc) %>% grep(pattern="SType_", value=T)
 surg_form <- paste0(surg_vars, collapse=" + ")
 surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
 comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
+year_vars <- colnames(hosp_proc) %>% grep(pattern = "year_", value=T)
+year_form <- paste0(year_vars, collapse = " + ")
+year_interact_form <- paste0(year_vars, ":AbnCog" , collapse=" + ")
 
 
 myform <- base_form %>% 
@@ -657,7 +666,7 @@ analysis_pipe_cv <- function(x) {
 
   x2 <- x %>% mutate(thisout=dc_status!="home")
     ## produce a shared set of cross-validation folds - note that dplyr / magrittr do not automatically know how to turn the fold-by-ref into a dataframe for manipulation, but they seems to have added a glm method
-  rs <- crossv_kfold(x2, k=100)
+  rs <- modelr::crossv_kfold(x2, k=100)
   ## train the first model on all folds, then evaluate it on the hold out data using AUROC as a critereon - note the wrapper since at low frequency / sample size an evaluation set can have no events
   r1 <- map(rs$train, . %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
     map2_dbl(rs$test, function(.x, .y){
@@ -699,9 +708,8 @@ myform <- base_form %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
-hosp_proc  %>% analysis_pipe_vu
-hosp_proc  %>% analysis_pipe_cv
-
+analysis_pipe_vu_output <- hosp_proc  %>% analysis_pipe_vu
+analysis_pipe_cv_output <- hosp_proc  %>% analysis_pipe_cv
 
 
 ######### Analysis 1
@@ -770,7 +778,7 @@ cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
 
 temp <- dc_home_glm %>% confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-png(file="forest_home.png", width=5, height=5, units="in", res=300)
+png(file="forest_home_surgery.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
 
@@ -780,8 +788,8 @@ text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=
 abline(v=0)
 abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
-text(x=-3, y=0.2, labels="less dc home", pos=4)
-text(x=-0, y=0.2, labels="more dc home", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x=-0, y=0.2, labels="less dc home", pos=4)
 
 points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
@@ -819,23 +827,129 @@ myform <- base_form %>%
 
 ## ICU admission
 analysis_pipe <- . %>% mutate(thisout=icu_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
-hosp_proc %>% analysis_pipe
+coef_ICU <- hosp_proc %>% analysis_pipe
+coef_ICU <- coef_ICU %>% add_column(exploratory_outcomes= "ICU")                                                                                
 
 ## AKI
 analysis_pipe <- . %>% mutate(thisout=AKI_v2) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
-hosp_proc %>% analysis_pipe
+coef_AKI <- hosp_proc %>% analysis_pipe
+coef_AKI <- coef_AKI %>% add_column(exploratory_outcomes= "AKI")                                                                                 
 
 ## arrythmia
 analysis_pipe <- . %>% mutate(thisout=AbnormalHeartRythmn) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
-
-hosp_proc %>% analysis_pipe
+coef_arrythmia <- hosp_proc %>% analysis_pipe
+coef_arrythmia <- coef_arrythmia %>% add_column(exploratory_outcomes= "Arrythmia")                                                                                  
 
 ## stroke
 analysis_pipe <- . %>% mutate(thisout=Stroke) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_stroke<- hosp_proc %>% analysis_pipe
+coef_stroke <- coef_stroke %>% add_column(exploratory_outcomes= "Stroke")   
+                                                                                
+# conference Intervel
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) 
+                                                                                
+ICU_glm <- hosp_proc %>% mutate(thisout= icu_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
+ci_ICU <- ICU_glm  %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3) %>% select(-"rname")
+coef_ICU <- bind_cols(coef_ICU, ci_ICU) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
-hosp_proc %>% analysis_pipe
+AKI_glm <- hosp_proc %>% mutate(thisout= AKI_v2) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )                                                                                
+ci_AKI <- AKI_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_AKI <- bind_cols(coef_AKI, ci_AKI) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+AHR_glm <- hosp_proc %>% mutate(thisout= AbnormalHeartRythmn) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )                                                                                
+ci_AHR <- AHR_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_arrythmia  <- bind_cols(coef_arrythmia, ci_AHR) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+Stroke_glm <- hosp_proc %>% mutate(thisout= Stroke) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )                                                                                
+ci_Stroke <- Stroke_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_stroke<- bind_cols(coef_stroke, ci_Stroke) %>% relocate(exploratory_outcomes, .before = Estimate) 
+
+
+exploratory_outcomes_glm <- bind_rows(coef_ICU, coef_AKI, coef_arrythmia , coef_stroke  )
+exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
+exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm[["97.5 %"]] %<>% exp %>% round(2)
+exploratory_outcomes_glm %<>% rename(`p val`= `Pr(>|z|)`)
+exploratory_outcomes_glm[["p val"]] %<>%  round(3) %>% format.pval(eps=.001)                                                                                 
+
+
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" )
+
+
+dc_home_glm_year <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+readmit_glm_year <- hosp_proc %>%filter(dc_status=="home") %>% mutate(thisout=readmit) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+death_glm_year <- hosp_proc %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+los_glm_year <- hosp_proc %>%filter %>% filter(dc_status=="home") %>% mutate(thisout=LoS) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=quasipoisson() )
+
+
+coef_home_year <- dc_home_glm_year  %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_readmit_year <-  readmit_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_death_year <- death_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_los_year <- los_glm_year %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`t value`)
+
+ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector %>% exp %>% round(2) %>% sprintf(fmt="%.2f") %>% paste(collapse=" to ")
+
+ci_home_year <- dc_home_glm_year %>% ci_pipe
+ci_readmit_year <- readmit_glm_year %>% ci_pipe
+ci_death_year <- death_glm_year %>% ci_pipe
+ci_los_year <- los_glm_year %>% ci_pipe
+
+
+
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>% 
+  update( paste0("~.+", year_interact_form) ) %>%
+  update( paste0("~.+", comorbid_form) ) 
+  
+
+inter_glm_year <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+
+point_inter_year <-   inter_glm_year %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(rname, value)
+  
+cis_inter_year <- inter_glm_year  %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog"))
+cis_inter_year <- inner_join(cis_inter_year, point_inter_year %>% select(rname, value), by="rname")
+cis_inter_year <- cis_inter_year %>% mutate( YEAR =rname %>% sub(pattern=":.*", replacement="") )
+                                                                                
+
+#point_inter_year <- point_inter_year[cis_inter_year%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
+#cis_inter_year %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+cis_inter_year %<>% arrange(YEAR)                                                                              
+                                                                           
+temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+
+cis_inter_year %<>%  bind_rows( data.frame(value=coef_home_year[2], `97.5 %`=temp1[["97.5 %"]], `2.5 %`=temp1[["2.5 %"]], YEAR="All Pre-Epic"  ) )
+                                                                                
+png(file="forest_home_year.png", width=5, height=5, units="in", res=300)
+par(mar=c(3,0,0,0))
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-7, 0.3), type='n', axes=FALSE, ylab="", xlab="")
+
+text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR %>% sub(pattern="year_", replacement="") , pos=4)
+# text(x=-15, y=0, labels="Months", pos=4)
+# text(x=seq(from=0, to=60, by=6), y=0, labels=seq(from=0, to=60, by=6), pos=4)
+abline(v=0)
+abline(h=-.1)
+text(x=-6, y=0.2, labels="YEAR", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x=-0, y=0.2, labels="less dc home", pos=4)
+
+points(x=cis_inter_year$value, y=-seq.int(nrow(cis_inter_year)), pch=19  )
+arrows(y0=-seq.int(nrow(cis_inter_year)), y1=-seq.int(nrow(cis_inter_year)), x0=cis_inter_year[["2.5 %"]], x1=cis_inter_year[["97.5 %"]]  , length=0)
+
+text(x=-5.9, y=-(nrow(cis_inter_year)+1) , labels = "overall" , pos=4)
+points(x=coef_home_year[2], y=-(nrow(cis_inter_year)+1), pch=19 , col='red')
+arrows(y0=-(nrow(cis_inter_year)+1), y1=-(nrow(cis_inter_year)+1), x0=temp1[["2.5 %"]], x1=temp1[["97.5 %"]]  , length=0, col='red')
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
+axis(1, at=-4, labels="odds-ratio", lwd=0)
+dev.off()
+
+
 
 
 saveRDS(hosp_proc, "merged_data.RDS" )
@@ -862,8 +976,10 @@ save( file="cognition_cache.rda" ,
   surg_interact_form ,
   comorbid_form ,
   pretty_names, 
-  analysis_pipe_vu,
-  analysis_pipe_cv
+  analysis_pipe_vu_output ,
+  analysis_pipe_cv_output ,
+  exploratory_outcomes_glm ,
+  cis_inter_year
 )
 
 

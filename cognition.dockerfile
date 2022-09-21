@@ -1,5 +1,5 @@
 FROM rocker/verse:4.1.2
-## tag cryanking/cognitioncheck:1.1 
+## tag cryanking/cognitioncheck:1.1
 
 ARG R_VERSION
 ARG BUILD_DATE
@@ -39,5 +39,15 @@ RUN install2.r --error kableExtra
      
 # fixes a wierd error
 RUN install2.r --error Rcpp
+# fix the repo for tex to the historical version
+RUN tlmgr option repository http://ftp.math.utah.edu/pub/tex/historic/systems/texlive/2021/tlnet-final
+# install a package to fore tlmgr to update
+RUN R -e 'tinytex::tlmgr_install(pkgs="amsmath")' 
+# install almost all the packages needed to make the report generate
+COPY ./dummy_report.rmd /code/dummy_report.rmd
+RUN R -e 'rmarkdown::render("/code/dummy_report.rmd")'
+RUN R -e 'tinytex::tlmgr_install(pkgs=c("amsmath","environ" , "threeparttablex" , "threeparttable" , "tabu" , "varwidth" , "pdflscape" , "float" , "wrapfig" , "multirow" , "trimspaces" , "makecell" , "ulem"))' 
 
-RUN chmod -R 777 /root ; chmod 777 /usr/local/lib/R/site-library /usr/local/lib/R/library
+
+
+RUN chmod -R 777 /root ; chmod -R 777 /usr/local/lib/R/site-library /usr/local/lib/R/library /usr/local/texlive/
