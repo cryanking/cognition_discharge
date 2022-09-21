@@ -116,7 +116,7 @@ cog_dates <- cog_dates[MEASURE_NAME %chin% c("Short Blessed Total Score" , "AD8 
 ## filter to just the variables of interest
 merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score`, low_barthel=`Barthel index score`<100 ) ] %>% 
 merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>%
-merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) ) ] , by="orlogid" )
+merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) , HTN) ] , by="orlogid" )
 ## i merge the discharge dates later, will transform the death dates to an outcome then
 merged_data <- merged_data[age>=64.5]
 

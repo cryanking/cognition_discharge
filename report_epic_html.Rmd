@@ -13,7 +13,7 @@ date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
     - \usepackage{colortbl}
 ---
-<!-- docker run -v '/mnt/ris/Active/ActFastData/:/research/'  -v '/home/cognition_discharge/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R --args commit=$(git --git-dir /code/.git rev-parse --verify HEAD) -e 'rmarkdown::render("/code/report_epic.Rmd")'
+<!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -e 'rmarkdown::render("/code/report_epic_html.Rmd")'
 LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/lavanya/gitrepos/cognition_discharge:/script_home/' bsub -G 'compute-christopherking' -n 4 -R 'rusage[mem=15GB] span[hosts=1]' -M 15GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
 -->
 ```{r setup, include=FALSE}
@@ -119,7 +119,7 @@ Characteristics of the cohort and overall outcome rates are given in Table \@ref
 AD8 was abnormal (>=2) in `r merged_data2$AD8 %>% is_greater_than(2) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients; SBT was abnormal (>=5) in `r merged_data2$SBT %>% is_greater_than(5) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients.
 
 ```{r desc, echo=FALSE, messages=FALSE}
-factor_vars<- c('Sex' , 'RACE' , "CAD", "CHF", "Diabetes", "COPD", "CKD" , "CVA(TIA)",   "cancerStatus", "AFIB", "low_functional_capacity", "low_barthel") 
+factor_vars<- c('Sex' , 'RACE' , "CAD", "CHF", "Diabetes", "COPD", "CKD" , "CVA(TIA)", "HTN",  "cancerStatus", "AFIB", "low_functional_capacity", "low_barthel") 
 outcome_factors<- c("dc_home" , "readmit", "death", "ICU" )
 outcome_con <- "los"
 con_vars <- c( 'age', 'BMI' ) # 
