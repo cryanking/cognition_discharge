@@ -80,13 +80,12 @@ AD8 was abnormal (>=2) in `r hosp_proc$AD8 %>% is_greater_than(2) %>% mean(na.rm
 
 ```{r tableone, echo=FALSE, messages=FALSE}
 factor_vars<- c('sex' , 'race' ,  'low_barthel' , "CAD", "CHF", "AF", "DM" , "HTN", "COPD", "CKD" , "CVA",   "Current_cancer", 'low_functional_capacity')
-outcome_factors<- c("dc_home" , "readmit_30", "death", "ICU" )
+outcome_factors<- c("dc_not_home" , "readmit_30", "death", "ICU" )
 outcome_con <- "LoS"
 con_vars <- c( 'Age' , 'BMI')
-
 hosp_proc %>% rename(Age=Age_at_CPAP, CAD=`Coronary artery disease`, CHF=Congestive_heart_failure, AF=`Atrial fibrillation or flutter history`, DM=Diabetes_mellitus , CKD=`Chronic kidney disease`, readmit_30=readmit, HTN=Hypertension) %>% 
 mutate(low_barthel = Barthel %>% is_less_than(100) %>% as.factor %>% fct_explicit_na ) %>%
-mutate(dc_home=dc_status=="home") %>%
+mutate(dc_not_home=dc_status!="home") %>%
 mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "impaired cognition")  ) ) %>%
  CreateTableOne(vars = c(factor_vars , con_vars, outcome_factors, outcome_con ) , strata = "AbnCog" , data = .   , factorVars = c(factor_vars, outcome_factors) ,includeNA = FALSE, test=TRUE) -> tab3
 

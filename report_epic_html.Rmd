@@ -120,10 +120,11 @@ AD8 was abnormal (>=2) in `r merged_data2$AD8 %>% is_greater_than(2) %>% mean(na
 
 ```{r desc, echo=FALSE, messages=FALSE}
 factor_vars<- c('Sex' , 'RACE' , "CAD", "CHF", "Diabetes", "COPD", "CKD" , "CVA(TIA)", "HTN",  "cancerStatus", "AFIB", "low_functional_capacity", "low_barthel") 
-outcome_factors<- c("dc_home" , "readmit", "death", "ICU" )
+outcome_factors<- c("dc_not_home" , "readmit", "death", "ICU" )
 outcome_con <- "los"
 con_vars <- c( 'age', 'BMI' ) # 
 
+merged_data2 %<>% mutate(dc_not_home =  not(dc_home))
 merged_data2 %>% 
 mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "impaired cognition")  ) ) %>%
  CreateTableOne(vars = c(factor_vars , con_vars, outcome_factors, outcome_con ) , strata = "AbnCog" , data = .   , factorVars = c(factor_vars, outcome_factors) ,includeNA = FALSE, test=TRUE) -> tab3
