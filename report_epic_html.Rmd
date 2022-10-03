@@ -14,7 +14,9 @@ header-includes:
     - \usepackage{colortbl}
 ---
 <!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -e 'rmarkdown::render("/code/report_epic_html.Rmd")'
-LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/lavanya/gitrepos/cognition_discharge:/script_home/' bsub -G 'compute-christopherking' -n 4 -R 'rusage[mem=15GB] span[hosts=1]' -M 15GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
+
+LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/christopherking/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=16GB] span[hosts=1]' -M 16GB -q general -a 'docker(cryanking/cognitioncheck:1.1)' R  -e 'rmarkdown::render(input="/code/report_epic_html.Rmd", output_dir="/research/")'
+
 -->
 ```{r setup, include=FALSE}
 library("magrittr")
@@ -124,7 +126,7 @@ outcome_factors<- c("dc_not_home" , "readmit", "death", "ICU" )
 outcome_con <- "los"
 con_vars <- c( 'age', 'BMI' ) # 
 
-merged_data2 %<>% mutate(dc_not_home =  not(dc_home))
+merged_data2 %<>% mutate(dc_not_home =  (dc_home))
 merged_data2 %>% 
 mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "impaired cognition")  ) ) %>%
  CreateTableOne(vars = c(factor_vars , con_vars, outcome_factors, outcome_con ) , strata = "AbnCog" , data = .   , factorVars = c(factor_vars, outcome_factors) ,includeNA = FALSE, test=TRUE) -> tab3
