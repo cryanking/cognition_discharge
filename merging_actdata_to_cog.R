@@ -775,8 +775,11 @@ cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") 
 
 point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+cis_inter$value <-  point_inter$value
 
 temp <- dc_home_glm %>% confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+
+cis_inter <- rbind(cis_inter, data.frame(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"]], `97.5 %`=temp[["97.5 %"]] , value=coef_home[2] )  )
 
 png(file="forest_home_surgery.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
@@ -979,7 +982,7 @@ save( file="cognition_cache.rda" ,
   analysis_pipe_vu_output ,
   analysis_pipe_cv_output ,
   exploratory_outcomes_glm ,
-  cis_inter_year
+  cis_inter, cis_inter_year
 )
 
 
