@@ -1,4 +1,7 @@
 ## docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -f /code/merging_actdata_to_cog.R
+## LSF_DOCKER_VOLUMES=' /storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/christopherking/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 6 -R 'rusage[mem=32GB] span[hosts=1]' -M 32GB -q general -a 'docker(cryanking/cognitioncheck:1.1)' R -f /code/merging_actdata_to_cog.R
+
+
 library(lubridate) 
 library(readxl)
 library(magrittr)
