@@ -262,7 +262,7 @@ for( thisset in names(code_patterns) ) {
 
 ## accumulate if a hospitalization has any matching codes
 procedure_codes[ , included := rowSums(.SD, na.rm = TRUE) > 0 , .SDcols=names(code_patterns) ]
-
+procedure_codes <- procedure_codes[is.finite(included)] [included >0 ]
 ## name consistency with older code
 # setnames(procedure_codes, names(code_patterns), names(code_patterns)%>% sub(pattern="_codes", replacement="") )
 
@@ -411,19 +411,19 @@ analysis_pipe_cv <- function(x) {
 
   x2 <- x %>% mutate(thisout=dispo!="home")
   rs <- modelr::crossv_kfold(x2, k=100)
-  r1 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
-    map2_dbl(rs$test, function(.x, .y){
+  r1 <- map(rs$train, possibly(. %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ), otherwise=NA_real_) ) %>% 
+    map2_dbl(rs$test, possibly( function(.x, .y){
       response <- .y %>% as.data.frame %>% pull("thisout")
       if(n_distinct(response) > 1 ) {
         pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) )  ) %>% auc } else {NA_real_}
-    } )
+    } , otherwise=NA_real_ ) )
 
-  r2 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
+  r2 <- map(rs$train, possibly(. %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) , otherwise=NA_real_ )) %>% map2_dbl(rs$test, possibly(function(.x, .y){
     response <- .y %>% as.data.frame %>% pull("thisout")
     if(n_distinct(response) > 1 ) {
       pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) )  ) %>% auc } else {NA_real_}
-  } )
-  t.test(na.omit(r1), na.omit(r2) )
+  } , otherwise=NA_real_ ))
+  possibly( t.test, otherwise=NA_real_)(na.omit(r1), na.omit(r2) )
 }
 
 global_age_spline <- bs(merged_data2$age, 3)
