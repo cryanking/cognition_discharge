@@ -154,7 +154,7 @@ hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t 
 bind_rows(N_mv_surg, N_epic_surg) %>% group_by(`Surgery Type`) %>% summarize(N=sum(N)) -> N_surg
 
 cis_combined %<>% left_join(N_surg, by=c("SurgeryType" = "Surgery Type") )
-cis_combined[16, "N"] <- sum(cis_combined[-16, "N"])
+cis_combined[16, "N"] <- nrow(hosp_proc) + nrow(merged_data2)
 
 png(file="forest_home_merge_surgery.png", width=7, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
@@ -162,7 +162,7 @@ plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab
 
 temp <- cis_combined %>% select(SurgeryType, surgfact) %>% unique( )
 
-text(x=-5.9, y=-temp$surgfact , labels = temp$SurgeryType , pos=4)
+text(x=-5.9, y=-temp$surgfact , labels = paste0(temp$SurgeryType, ", n=", cis_combined$N) , pos=4)
 abline(v=0)
 abline(h=-.1)
 text(x=-6, y=0.2, labels="Surgery type", pos=4)
@@ -175,7 +175,37 @@ arrows(y0=cis_combined$yval, y1=cis_combined$yval, x0=cis_combined[["2.5 %"]], x
 axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
+
+cis_inter_0 <- cis_inter %>% filter(era==1) %>% mutate(surgfact = SurgeryType %>% factor %>% forcats::fct_relevel("Overall", after=Inf) %>% as.integer)  %>% mutate(yval = -surgfact )
+cis_inter_0  %<>% left_join(N_epic_surg, by=c("SurgeryType" = "Surgery Type") )
+cis_inter_0  [14, "N"] <- nrow(merged_data2)
+
+
+png(file="forest_home_epic_surgery.png", width=7, height=5, units="in", res=300)
+par(mar=c(3,0,0,0))
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(min(cis_inter_0$yval-.5 ), 0), type='n', axes=FALSE, ylab="", xlab="")
+
+temp <- cis_inter_0  %>% select(SurgeryType, surgfact) %>% unique( )
+
+text(x=-5.9, y=-temp$surgfact , labels = paste0(temp$SurgeryType, ", n=", cis_inter_0 $N) , pos=4)
+abline(v=0)
+abline(h=-.1)
+text(x=-6, y=0.2, labels="Surgery type", pos=4)
+text(x=-3, y=0.2, labels="more dc home", pos=4)
+text(x= 0, y=0.2, labels="less dc home", pos=4)
+
+points(x=cis_inter_0 $value, y=cis_inter_0 $yval, pch=19 )
+arrows(y0=cis_inter_0 $yval, y1=cis_inter_0 $yval, x0=cis_inter_0 [["2.5 %"]], x1=cis_inter_0 [["97.5 %"]]  , length=0)
+
+axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
+axis(1, at=-4, labels="odds-ratio", lwd=0)
+dev.off()
+
+
 ```
+
+
+
 
 ## Methods
 Data from `r  merged_data2 %>% pull("preopdate") %>% min %>% (lubridate::date)` to `r  merged_data2 %>% pull("preopdate") %>% max %>% (lubridate::date)` were queried from the Epic electronic health record.
