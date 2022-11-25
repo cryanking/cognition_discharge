@@ -84,7 +84,7 @@ smartdata <- smartdata[CUR_VALUE_DATETIME > lubridate::ymd("2018-08-31")]
 setnames(smartdata, "SMRTDTA_ELEM_VALUE" , "Value" )
 
 
-sheet_list <- readxl::excel_sheets("/research/sync_aw_dump/Anesthesia SDEs.xlsx")
+sheet_list <- readxl::excel_sheets('/research/sync_aw_dump/Anesthesia SDEs.xlsx')
 all_sde <- list()
 for(i in sheet_list) {all_sde <- c(all_sde, list(readxl::read_xlsx("/research/sync_aw_dump/Anesthesia\ SDEs.xlsx", sheet=i)))}
 all_sde %<>% lapply(function(x){ set_colnames(x,c("SDE", "oldName", "label" , "Name" , rep("....a", length=ncol(x)-4L ) ) )[-1,c(1,4)] })
@@ -501,7 +501,7 @@ cis_inter$value <-  point_inter$value
 
 
 temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
-cis_inter <- rbind(cis_inter, data.frame(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"]], `97.5 %`=temp[["97.5 %"]] , value=coef_home[2] )  )
+cis_inter %<>% bind_rows( tibble(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"]], `97.5 %`=temp[["97.5 %"]], value=coef_home[[2]] ))
 
 setwd("/output/")
 png(file="forest_home_epic_surgery.png", width=7, height=5, units="in", res=300)
@@ -515,7 +515,7 @@ text(x=-6, y=0.2, labels="Surgery type", pos=4)
 text(x=-3, y=0.2, labels="more dc home", pos=4)
 text(x= 0, y=0.2, labels="less dc home", pos=4)
 
-points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
+points(x=cis_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
 
 text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)

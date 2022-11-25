@@ -779,7 +779,8 @@ cis_inter$value <-  point_inter$value
 
 temp <- dc_home_glm %>% confint %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-cis_inter <- rbind(cis_inter, data.frame(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"]], `97.5 %`=temp[["97.5 %"]] , value=coef_home[2] )  )
+cis_inter %<>% bind_rows( tibble(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"]], `97.5 %`=temp[["97.5 %"]], value=coef_home[[2]] ))
+
 
 png(file="forest_home_surgery.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
@@ -794,7 +795,7 @@ text(x=-6, y=0.2, labels="Surgery type", pos=4)
 text(x=-3, y=0.2, labels="more dc home", pos=4)
 text(x=-0, y=0.2, labels="less dc home", pos=4)
 
-points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
+points(x=cis_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
 
 text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
