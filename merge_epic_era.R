@@ -170,7 +170,7 @@ gut_codes = c("0D[BTVD5][89ABEFGHKLMNPQ]"  )
 , prost_codes = c("0VT0" )
 , bladder_codes = c("0TTB")
 , ueavfist_codes = c("031[345678569ABCH]0[A-Z0-9][DF]","03WY0J","05WY0[JK]Z" )
-, vats_codes = c("0BT[CDFGHJK]4ZZ")
+, vats_codes = c("0BT[CDFGHJK]4Z[XZ]" , "0BB[CDFGHJKLNP][348]Z[XZ]")
 )
 # "51570", "51575", "51596", "51590", "51595", "51580", "51585", "51555", "51550", "51565", "51597"
 # , "36830" , "36818", "36818", "36819", "36821", "36833", "36832", "36825"

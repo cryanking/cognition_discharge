@@ -225,7 +225,7 @@ gut_codes = c("^0D[BTVD5][89ABEFGHKLMNPQ]" , "45\\.[6789]", "^46\\.9[34]", "^48\
 , prost_codes = c("^0VT0" ,"^60\\.[2346]")
 , bladder_codes = c("^0TTB", "^57\\.[67]")
 , ueavfist_codes = c("39\\.42" ,  "39\\.53" , "39\\.27" , "39\\.29" , "^031[345678569ABC]0[A-Z0-9][DF]")
-, vats_codes = c("0BTC4ZZ" , "0BTD4ZZ" , "0BTF4ZZ" , "0BTG4ZZ" , "0BTH4ZZ" , "0BTJ4ZZ" , "0BTK4ZZ" , "0BTL4ZZ" , "32\\.20" , "32\\.24" , "32\\.25" , "32\\.41" )
+, vats_codes = c("0BTC4ZZ" , "0BTD4ZZ" , "0BTF4ZZ" , "0BTG4ZZ" , "0BTH4ZZ" , "0BTJ4ZZ" , "0BTK4ZZ" , "0BTL4ZZ" , "32\\.20" , "32\\.24" , "32\\.25" , "32\\.41", "0BB[CDFGHJKLNP][348]Z[XZ]","0BT[CDFGHJK]4Z[XZ]" )
 )
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
