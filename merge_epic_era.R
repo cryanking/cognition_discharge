@@ -475,8 +475,8 @@ ci_los <- los_glm %>% ci_pipe
 
 base_form <- "thisout ~ 1" %>% formula
 surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
-surg_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ) , collapse=" + ")
-surg_interact_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ),":AbnCog" ,  collapse=" + ")
+surg_form <- paste0(surg_vars %>% setdiff(c( "ueavfist_codes") ) , collapse=" + ")
+surg_interact_form <- paste0(surg_vars %>% setdiff(c( "ueavfist_codes") ),":AbnCog" ,  collapse=" + ")
 comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%

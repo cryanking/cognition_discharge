@@ -13,7 +13,7 @@ date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
     - \usepackage{colortbl}
 ---
-<!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -e 'rmarkdown::render("/code/report_epic_html.Rmd")'
+<!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -e 'rmarkdown::render("/code/report_epic_html.Rmd", output_dir="/research/")'
 
 LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/christopherking/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=16GB] span[hosts=1]' -M 16GB -q general -a 'docker(cryanking/cognitioncheck:1.1)' R  -e 'rmarkdown::render(input="/code/report_epic_html.Rmd", output_dir="/research/")'
 
