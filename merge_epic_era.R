@@ -1,6 +1,7 @@
 # docker run -v "/mnt/ris/ActFastData/:/research/" -v "/home/christopherking/gitdirs/cognition_discharge:/code" -v "/mnt/ris/lavanya/cognition_check/:/output" cryanking/cognitioncheck:1.1 R  -f /code/merge_epic_era.R
 
 #LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/ActFastData/:/research/  /storage1/fs1/christopherking/Active/lavanya/cognition_check/:/output/ /home/lavanya/gitrepos/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=32GB] span[hosts=1]' -M 32GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
+# for reasons that I think I uncovered at some point, the excel_sheets function fails
 #Digest: sha256:9b99f73d209fb61e18cd4829f7b01c039b6645484dd1c4fa79a20d7d809b7f1d
 
 library(data.table)
@@ -34,7 +35,7 @@ procedure_codes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 4.cs
 
 merged_post <- fread( "/research/Actfast_deident_epic/epic_outcomes.csv" )
 matching_ids <- fread( "/research/Actfast_reident_epic/epic_orlogid_codes.csv" )
-setnames(merged_post, "orlogid", "orlogid_encoded")
+# setnames(merged_post, "orlogid", "orlogid_encoded")
 
 exploratory_outcomes <- matching_ids[ , .(orlogid,orlogid_encoded) ][merged_post[ , .(orlogid_encoded, PNA, AF, post_aki_status, CVA, postop_trop_high, postop_vent_duration ) ] , on="orlogid_encoded"]
 exploratory_outcomes[, orlogid_encoded:= NULL]
@@ -357,15 +358,33 @@ merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4
 
 merged_data2 <- merge(merged_data2, exploratory_outcomes, by = "orlogid", all.x=TRUE)
 
+encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
+  if (!is.factor(x)) {
+      x <- as.factor(x)
+  }
+  encoding_matrix <- contrasts(x, contrasts = FALSE)
+  encoded_data <- encoding_matrix[as.integer(x),]
+  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
+  encoded_data
+}
 
-other_data <- readRDS("/output/old_epic_cog.RDS")
+merged_data2$year <- format(merged_data2$AnestStart, format= "%Y")
+
+merged_data2 <- data.table(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% data.table)
+
+saveRDS(merged_data2, "/output/merged_data_epic_1.RDS" )
+
+other_data <- readRDS("/output/merged_data2022.RDS")
+setnames(other_data,  "CVA(TIA)", "CVA_Stroke")    
 
 merged_data2 <- rbind(merged_data2, other_data, fill=T)
 for( thisvar in colnames(merged_data2 ) %>% grep(pattern="year_", value=T)  ) {
   set(merged_data2, j=thisvar, i= which(is.na(merged_data2[[thisvar]] ) ), 0)
 }
 
+figure1b <- readRDS( "/output/figure1_2022.RDS" )
 
+figure1$N <- figure1$N + figure1b$N
 
 
 pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "VATS" )
@@ -520,7 +539,7 @@ cis_inter %<>% bind_rows( tibble(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"
 setwd("/output/")
 png(file="forest_home_epic_surgery.png", width=7, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-14, 0), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-15, 0), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 abline(v=0)
@@ -532,9 +551,9 @@ text(x= 0, y=0.2, labels="less dc home", pos=4)
 points(x=cis_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
 
-text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
-points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
-arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+# text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
+# points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
+# arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
 axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
@@ -620,18 +639,6 @@ exploratory_outcomes_glm[["p val"]] %<>%  round(3) %>% format.pval(eps=.001)
 # exploratory_outcomes_glm $`Std. Error` <- round(exploratory_outcomes_glm$`Std. Error`, digits = 2)
 
 
-encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
-  if (!is.factor(x)) {
-      x <- as.factor(x)
-  }
-  encoding_matrix <- contrasts(x, contrasts = FALSE)
-  encoded_data <- encoding_matrix[as.integer(x),]
-  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
-  encoded_data
-}
-
-merged_data2$year <- format(merged_data2$AnestStart, format= "%Y")
-merged_data2 <- bind_cols(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% as_tibble)
 
 base_form <- "thisout ~ 1" %>% formula
 surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
@@ -691,11 +698,11 @@ cis_inter_year %<>%  arrange(YEAR)
            
 temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-cis_inter_year %<>%  bind_rows( data.frame(value=coef_home_year[2], `97.5 %`=temp1[["97.5 %"]], `2.5 %`=temp1[["2.5 %"]], YEAR="All Epic"  ) )
+cis_inter_year %<>%  bind_rows( tibble(value=unlist(coef_home_year[2]), "97.5 %"=temp1[["97.5 %"]], "2.5 %"=temp1[["2.5 %"]], YEAR="All Epic"  ) )
 
-png(file="forest_home_epic_year.png", width=5, height=5, units="in", res=300)
+png(file="/output/forest_home_epic_year.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-4, 0.3), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-6, 0.3), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR %>% sub(pattern="year_", replacement="")  , pos=4)
 # text(x=-15, y=0, labels="Months", pos=4)

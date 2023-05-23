@@ -787,7 +787,7 @@ cis_inter %<>% bind_rows( tibble(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"
 
 png(file="forest_home_surgery.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-16, 0), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-15, 0), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 # text(x=-15, y=0, labels="Months", pos=4)
@@ -801,9 +801,9 @@ text(x=-0, y=0.2, labels="less dc home", pos=4)
 points(x=cis_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
 
-text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
-points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
-arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+# text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
+# points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
+# arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
 axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
@@ -931,8 +931,9 @@ cis_inter_year %<>% arrange(YEAR)
                                                                            
 temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-cis_inter_year %<>%  bind_rows( data.frame(value=coef_home_year[2], `97.5 %`=temp1[["97.5 %"]], `2.5 %`=temp1[["2.5 %"]], YEAR="All Pre-Epic"  ) )
-                                                                                
+# cis_inter_year %<>%  bind_rows( data.frame(value=coef_home_year[2], `97.5 %`=temp1[["97.5 %"]], `2.5 %`=temp1[["2.5 %"]], YEAR="All Pre-Epic"  ) )
+cis_inter_year %<>%  bind_rows( tibble(value=unlist(coef_home_year[2]), "97.5 %"=temp1[["97.5 %"]], "2.5 %"=temp1[["2.5 %"]], YEAR="All Pre-Epic"  ) )
+                                                          
 png(file="forest_home_year.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-7, 0.3), type='n', axes=FALSE, ylab="", xlab="")
