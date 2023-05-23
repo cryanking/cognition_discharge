@@ -36,7 +36,8 @@ library(dplyr)
 merged_data2 <- readRDS("/research/merged_data2.RDS" )
 load(file="/research/cognition_cache_epic.rda")
 # cis_inter_year %>% mutate( value = if_else(YEAR=="All Epic", Estimate, value ) , `2.5 %`  )
-cis_inter_year %<>% mutate( value = coalesce(Estimate, value ) , `2.5 %`= coalesce(`2.5 %`, X2.5..), `97.5 %`= coalesce(`97.5 %`, X97.5..)  ) %>% select(YEAR, value, `2.5 %`, `97.5 %`)
+# cis_inter_year %<>% mutate( value = coalesce(Estimate, value ) , `2.5 %`= coalesce(`2.5 %`, X2.5..), `97.5 %`= coalesce(`97.5 %`, X97.5..)  ) %>% select(YEAR, value, `2.5 %`, `97.5 %`)
+cis_inter_year %<>%  select(YEAR, value, `2.5 %`, `97.5 %`)
 
 merged_data2 %>% pull("year") %>% table %>% addmargins -> year_totals
 names(year_totals) %<>% paste0("year_" , .)
@@ -47,7 +48,11 @@ year_totals <- data.frame(year_totals)
 
 pre_epic_data <- new.env()
 load(file="/research/cognition_cache.rda", envir=pre_epic_data)
+if( "Estimate" %in% colnames(pre_epic_data$cis_inter_year)) {
 pre_epic_data$cis_inter_year %<>% mutate( value = coalesce(Estimate, value ) , `2.5 %`= coalesce(`2.5 %`, X2.5..), `97.5 %`= coalesce(`97.5 %`, X97.5..)  ) %>% select(YEAR, value, `2.5 %`, `97.5 %`)
+} else {
+pre_epic_data$cis_inter_year %<>%  select(YEAR, value, `2.5 %`, `97.5 %`)
+}
 
 
 hosp_proc <- readRDS("/research/merged_data.RDS" )
