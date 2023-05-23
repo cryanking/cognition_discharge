@@ -175,13 +175,15 @@ gut_codes = c("0D[BTVD5][89ABEFGHKLMNPQ]"  )
 # "51570", "51575", "51596", "51590", "51595", "51580", "51585", "51555", "51550", "51565", "51597"
 # , "36830" , "36818", "36818", "36819", "36821", "36833", "36832", "36825"
 
+
+
 cpt_codes <- readxl::read_xlsx("/research/sync_aw_dump/CPT codes.xlsx", skip=1)
 cpt_codes %<>% dplyr::filter(is.na(Exclude))
 cpt_codes <- as.data.frame(cpt_codes)
 setDT(cpt_codes)
 
-pattern_names <- data.table(code_names = names(code_patterns), Group= c(2,3,1,4,5,6,9,10,7,8,12,13,15,15,11 ))
-cpt_codes <- pattern_names[cpt_codes ,on="Group"]
+pattern_names <- data.table(code_names = names(code_patterns), Group= c(2,3,1,4,5,6,9,10,7,8,12,13,14,15,11 ))
+cpt_codes <- pattern_names[cpt_codes ,on="Group", nomatch=NULL]
 
 
 
@@ -215,7 +217,8 @@ code_patterns$prost_codes <- c(code_patterns$prost_codes, cpt_code_pattern[cpt_c
 
 code_patterns$bladder_codes <- c(code_patterns$bladder_codes, cpt_code_pattern[cpt_code_pattern$group==14 , "code", drop=TRUE] ) %>% unique
 
-code_patterns$ueavfist_codes <- c(code_patterns$ueavfist_codes, cpt_code_pattern[cpt_code_pattern$group==15 , "code", drop=TRUE] ) %>% unique
+# code_patterns$ueavfist_codes <- c(code_patterns$ueavfist_codes, cpt_code_pattern[cpt_code_pattern$group==15 , "code", drop=TRUE] ) %>% unique
+code_patterns$ueavfist_codes <- NULL ## not interested in this group
 
 code_patterns$vats_codes <- c(code_patterns$vats_codes, cpt_code_pattern[cpt_code_pattern$group==11 , "code", drop=TRUE] ) %>% unique
 
@@ -271,7 +274,7 @@ procedure_codes <- procedure_codes[is.finite(included)] [included >0 ]
 figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(intersect(procedure_codes$orlogid , merged_data$orlogid ) ), deltaN=NA_real_) )
 
 
-merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
+merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, vats_codes, dispo) ] , by="orlogid")
 
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
@@ -333,7 +336,7 @@ merged_data2 <- merge(merged_data2, testing_data2 , by="orlogid", all.x=TRUE, al
 
 merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < dist + ddays(30), TRUE, default=FALSE) ]
 
-merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum) -> code_counts
+merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, vats_codes)] %>% sapply(sum) -> code_counts
 # 
 #          gut_codes      stomach_codes        chole_codes         panc_codes 
 #                662                168                 81                174 
@@ -354,7 +357,18 @@ merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4
 
 merged_data2 <- merge(merged_data2, exploratory_outcomes, by = "orlogid", all.x=TRUE)
 
-pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
+
+other_data <- readRDS("/output/old_epic_cog.RDS")
+
+merged_data2 <- rbind(merged_data2, other_data, fill=T)
+for( thisvar in colnames(merged_data2 ) %>% grep(pattern="year_", value=T)  ) {
+  set(merged_data2, j=thisvar, i= which(is.na(merged_data2[[thisvar]] ) ), 0)
+}
+
+
+
+
+pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "VATS" )
 
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
@@ -367,7 +381,7 @@ comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatu
 ## surgery specific effects - build formulas externally because of the non-factor structure
 ## save these building blocks for various models
 base_form <- "thisout ~ 1" %>% formula
-surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
+surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T) %>% setdiff(c( "ueavfist_codes") ) ## decided to drop this group
 surg_form <- paste0(surg_vars, collapse=" + ")
 surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
 comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")

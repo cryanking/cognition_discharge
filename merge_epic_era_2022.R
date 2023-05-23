@@ -1,4 +1,4 @@
-# docker run -v "/mnt/ris/ActFastData/:/research/" -v "/home/christopherking/gitdirs/cognition_discharge:/code" -v "/mnt/ris/lavanya/cognition_check/:/output" cryanking/cognitioncheck:1.1 R  -f /code/merge_epic_era.R
+# docker run -v "/mnt/ris/ActFastData/:/research/" -v "/home/christopherking/gitdirs/cognition_discharge:/code" -v "/mnt/ris/lavanya/cognition_check/:/output" cryanking/cognitioncheck:1.1 R  -f /code/merge_epic_era_2022.R
 
 #LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/ActFastData/:/research/  /storage1/fs1/christopherking/Active/lavanya/cognition_check/:/output/ /home/lavanya/gitrepos/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=32GB] span[hosts=1]' -M 32GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
 #Digest: sha256:9b99f73d209fb61e18cd4829f7b01c039b6645484dd1c4fa79a20d7d809b7f1d
@@ -238,7 +238,7 @@ cpt_codes %<>% dplyr::filter(is.na(Exclude))
 cpt_codes <- as.data.frame(cpt_codes)
 setDT(cpt_codes)
 
-pattern_names <- data.table(code_names = names(code_patterns), Group= c(2,3,1,4,5,6,9,10,7,8,12,13,15,15,11 ))
+pattern_names <- data.table(code_names = names(code_patterns), Group= c(2,3,1,4,5,6,9,10,7,8,12,13,14,15,11 ))
 cpt_codes <- pattern_names[cpt_codes ,on="Group"]
 
 
@@ -273,7 +273,8 @@ code_patterns$prost_codes <- c(code_patterns$prost_codes, cpt_code_pattern[cpt_c
 
 code_patterns$bladder_codes <- c(code_patterns$bladder_codes, cpt_code_pattern[cpt_code_pattern$group==14 , "code", drop=TRUE] ) %>% unique
 
-code_patterns$ueavfist_codes <- c(code_patterns$ueavfist_codes, cpt_code_pattern[cpt_code_pattern$group==15 , "code", drop=TRUE] ) %>% unique
+# code_patterns$ueavfist_codes <- c(code_patterns$ueavfist_codes, cpt_code_pattern[cpt_code_pattern$group==15 , "code", drop=TRUE] ) %>% unique
+code_patterns$ueavfist_codes <- NULL ## not interested in this group
 
 code_patterns$vats_codes <- c(code_patterns$vats_codes, cpt_code_pattern[cpt_code_pattern$group==11 , "code", drop=TRUE] ) %>% unique
 
@@ -329,7 +330,7 @@ procedure_codes <- procedure_codes[is.finite(included)] [included >0 ]
 figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(intersect(procedure_codes$orlogid , merged_data$orlogid ) ), deltaN=NA_real_) )
 
 
-merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
+merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, vats_codes, dispo) ] , by="orlogid")
 
 merged_data2 %<>% merge(an_records[,.(AnestStart=an_start, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
@@ -373,7 +374,7 @@ merged_data2[is.na(readmit)  , readmit:= FALSE]
 # setnames(merged_data2, "postop_los", "los")
 merged_data2[, los := fcase(is.na(postop_los), preop_los, is.na(preop_los), postop_los, is.finite(preop_los+postop_los), preop_los+postop_los   )]
 
-merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum) -> code_counts
+merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, vats_codes)] %>% sapply(sum) -> code_counts
 # 
 #          gut_codes      stomach_codes        chole_codes         panc_codes 
 #                662                168                 81                174 
@@ -409,8 +410,8 @@ encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
 
 merged_data2 <- data.table(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% data.table)
 
-saveRDS(merged_data2, "/output/sync_aw_dump/merged_data2022.RDS" )
-saveRDS(figure1, "/output/sync_aw_dump/figure1_2022.RDS" )
+saveRDS(merged_data2, "/output/merged_data2022.RDS" )
+saveRDS(figure1, "/output/figure1_2022.RDS" )
 # 
 # other_data <- readRDS("/research/sync_aw_dump/old_epic_cog.RDS")
 # 

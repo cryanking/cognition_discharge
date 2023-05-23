@@ -224,11 +224,11 @@ gut_codes = c("^0D[BTVD5][89ABEFGHKLMNPQ]" , "45\\.[6789]", "^46\\.9[34]", "^48\
 , neph_codes = c( "^0TT[012]", "^55\\.[45]")
 , prost_codes = c("^0VT0" ,"^60\\.[2346]")
 , bladder_codes = c("^0TTB", "^57\\.[67]")
-, ueavfist_codes = c("39\\.42" ,  "39\\.53" , "39\\.27" , "39\\.29" , "^031[345678569ABC]0[A-Z0-9][DF]")
+# , ueavfist_codes = c("39\\.42" ,  "39\\.53" , "39\\.27" , "39\\.29" , "^031[345678569ABC]0[A-Z0-9][DF]")
 , vats_codes = c("0BTC4ZZ" , "0BTD4ZZ" , "0BTF4ZZ" , "0BTG4ZZ" , "0BTH4ZZ" , "0BTJ4ZZ" , "0BTK4ZZ" , "0BTL4ZZ" , "32\\.20" , "32\\.24" , "32\\.25" , "32\\.41", "0BB[CDFGHJKLNP][348]Z[XZ]","0BT[CDFGHJK]4Z[XZ]" )
 )
 
-pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
+pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "VATS" )
 
 pretty_names <- cbind(pretty_names , names(code_patterns) %>% sub(pattern="_codes", replacement="") %>%paste0("SType_", . )  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
