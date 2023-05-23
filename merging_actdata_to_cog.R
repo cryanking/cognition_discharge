@@ -814,7 +814,7 @@ anova(inter_glm, dc_home_glm, test="Rao")
 
 clinical_outcomes <- read_csv("outcomes.csv")
 id_links <- read_csv("mv_era_all_ids.csv", col_types=cols(PatientID=col_character(), DoS = col_datetime(),  DoB = col_datetime() , EMPI = col_character(), IDCode= col_character(), VisitIDCode = col_character(),AnestStop = col_datetime()  ))
-clinical_outcomes %<>% inner_join(id_links, by="caseid", na_matches="never" ) %>% select(VisitIDCode, icu_status, Stroke, AKI_v2, AbnormalHeartRythmn, DoS )
+clinical_outcomes %<>% inner_join(id_links, by="caseid", na_matches="never" ) %>% select(VisitIDCode, icu_status, Stroke, AKI_v2, AbnormalHeartRythmn, DoS, Pneumonia )
 
 hosp_proc %<>% left_join(clinical_outcomes , by=c("PAN"="VisitIDCode" ) , na_matches="never" ) %>% group_by(PAN) %>% slice_min(order_by=DoS.y, n=1, with_ties=FALSE) %>% ungroup %>% rename(DoS=DoS.x) 
 
@@ -852,7 +852,13 @@ analysis_pipe <- . %>% mutate(thisout=Stroke) %>% mutate(AbnCog= as.numeric(AbnC
 coef_stroke<- hosp_proc %>% analysis_pipe
 coef_stroke <- coef_stroke %>% add_column(exploratory_outcomes= "Stroke")   
                                                                                 
-# conference Intervel
+## PNA
+analysis_pipe <- . %>% mutate(thisout=Pneumonia) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
+coef_Pna<- hosp_proc %>% analysis_pipe
+coef_Pna <- coef_Pna %>% add_column(exploratory_outcomes= "Pneumonia")   
+   
+   
+   # conference Intervel
 ci_pipe <- . %>%  confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) 
                                                                                 
 ICU_glm <- hosp_proc %>% mutate(thisout= icu_status) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )
@@ -871,8 +877,11 @@ Stroke_glm <- hosp_proc %>% mutate(thisout= Stroke) %>% mutate(AbnCog= as.numeri
 ci_Stroke <- Stroke_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
 coef_stroke<- bind_cols(coef_stroke, ci_Stroke) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
+Pna_glm <- hosp_proc %>% mutate(thisout= Pneumonia) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() )                                                                                
+ci_Pna <- Pna_glm %>% ci_pipe %>% mutate_if(is.numeric, round, digits = 3)  %>% select(-"rname")
+coef_Pna<- bind_cols(coef_Pna, ci_Pna) %>% relocate(exploratory_outcomes, .before = Estimate) 
 
-exploratory_outcomes_glm <- bind_rows(coef_ICU, coef_AKI, coef_arrythmia , coef_stroke  )
+exploratory_outcomes_glm <- bind_rows(coef_ICU, coef_AKI, coef_arrythmia , coef_stroke , coef_Pna )
 exploratory_outcomes_glm <- exploratory_outcomes_glm %>% select(-c("rname", "Std. Error"))  
 exploratory_outcomes_glm[["Estimate"]] %<>% exp %>% round(2)
 exploratory_outcomes_glm[["2.5 %"]] %<>% exp %>% round(2)
