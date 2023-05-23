@@ -20,7 +20,8 @@ update_root  <- '/research/2022_update/'
 
 ## AD8, SBT included in flowsheets
 ## the barthel ad8 and sbt are also in /research/tectonics-I2Refresh/Tectonics_Intermediates/clarity_preop_vitals.csv
-processed_preop_screen <- fread( paste0(update_root, "intermediates/clarity_cpap_flows.csv") )
+# processed_preop_screen <- fread( paste0(update_root, "intermediates/clarity_cpap_flows.csv") )
+processed_preop_screen <- fread( paste0(update_root, "intermediates/clarity_preop_vitals.csv") )
 
 ## demographics and comorbidities pre-processed in main actfast
 preop_covariates <- fread(paste0(update_root, "intermediates/epic_preop_before_labs_text_notes.csv") ) #surgery related columns missing("SERVICE_NM", "SurgService_Value")
@@ -170,7 +171,7 @@ cog_dates <- cog_dates[MEASURE_NAME %chin% c("Short Blessed Total Score" , "AD8 
 
 
 ## filter to just the variables of interest
-merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score`, low_barthel=`Barthel index score`<100 ) ] %>% 
+merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score`, low_barthel=`Barthel index score`<100 , preop_los) ] %>% 
 merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>%
 merge(preop_covariates[, .(orlogid, death=death_in_30 , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) , HTN) ] , by="orlogid" )
 ## i merge the discharge dates later, will transform the death dates to an outcome then
@@ -369,8 +370,8 @@ readmit_data <- my_visits[admt>AnestStop & admt<AnestStop +ddays(30) ,.(readmit 
 merged_data2 %<>% merge(readmit_data, all.x=TRUE, by="orlogid")
 merged_data2[is.na(readmit)  , readmit:= FALSE] 
 }
-setnames(merged_data2, "postop_los", "los")
-
+# setnames(merged_data2, "postop_los", "los")
+merged_data2[, los := fcase(is.na(postop_los), preop_los, is.na(preop_los), postop_los, is.finite(preop_los+postop_los), preop_los+postop_los   )]
 
 merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum) -> code_counts
 # 
@@ -392,10 +393,33 @@ merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4
 # setDT(merged_data2)                                                                               
 
 merged_data2 <- merge(merged_data2, exploratory_outcomes, by = "orlogid", all.x=TRUE)
+setnames(merged_data2, "CVA_Stroke", "CVA(TIA)")                                                                               
+merged_data2[, year := year(AnestStart)]
 
-saveRDS(merged_data2, "/research/sync_aw_dump/merged_data2022.RDS" )
-saveRDS(figure1, "/research/sync_aw_dump/figure1_2022.RDS" )
+encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
+  if (!is.factor(x)) {
+      x <- as.factor(x)
+  }
+  encoding_matrix <- contrasts(x, contrasts = FALSE)
+  encoded_data <- encoding_matrix[as.integer(x),]
+  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
+  encoded_data
+}
 
 
+merged_data2 <- data.table(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% data.table)
 
-
+saveRDS(merged_data2, "/output/sync_aw_dump/merged_data2022.RDS" )
+saveRDS(figure1, "/output/sync_aw_dump/figure1_2022.RDS" )
+# 
+# other_data <- readRDS("/research/sync_aw_dump/old_epic_cog.RDS")
+# 
+# setdiff( colnames(other_data), colnames(merged_data2) )
+# setdiff(  colnames(merged_data2), colnames(other_data) )
+# 
+# all_data <- rbind(merged_data2, other_data, fill=T)
+# for( thisvar in colnames(all_data ) %>% grep(pattern="year_", value=T)  ) {
+# set(all_data, j=thisvar, i= which(is.na(all_data[[thisvar]] ) ), 0)
+# }
+# 
+# 
