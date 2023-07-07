@@ -79,7 +79,7 @@ Characteristics of the cohort and overall outcome rates are given in Table \@ref
 AD8 was abnormal (>=2) in `r hosp_proc$AD8 %>% is_greater_than(2) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients; SBT was abnormal (>=5) in `r hosp_proc$SBT %>% is_greater_than(5) %>% mean(na.rm=T) %>% multiply_by(100) %>% round(1)` percent of included patients.
 
 ```{r tableone, echo=FALSE, messages=FALSE}
-factor_vars<- c('sex' , 'race' ,  'low_barthel' , "CAD", "CHF", "AF", "DM" , "HTN", "COPD", "CKD" , "CVA",   "Current_cancer", 'low_functional_capacity')
+factor_vars<- c('sex' , 'race' ,  'low_barthel' , "CAD", "CHF", "AF", "DM" , "HTN", "COPD", "CKD" , "CVA",   "Current_cancer", 'low_functional_capacity', "Dementia")
 outcome_factors<- c("dc_not_home" , "readmit_30", "death", "ICU" )
 outcome_con <- "LoS"
 con_vars <- c( 'Age' , 'BMI')
