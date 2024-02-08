@@ -75,7 +75,7 @@ TextSignals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
                             "numeric", "numeric", "numeric", "numeric", "numeric"))
 
 
-TextSignals %<>% select(one_of("CPAPPatientID", "Sex", "Race", "Ethnicity", "Alcohol use", "Drinks/week", "Functional capacity", "Dialysis history", "Cirrhosis etiology", "Surgical Service") )
+TextSignals %<>% select(one_of("CPAPPatientID", "sex", "Race", "Ethnicity", "Alcohol use", "Drinks/week", "Functional capacity", "Dialysis history", "Cirrhosis etiology", "Surgical Service") )
 
 TextSignals %<>% (janitor::clean_names)
 TextSignals$race %<>% as.factor %>% fct_other(keep=c("7","9")) %>% fct_recode(White="9", Black="7") %>% fct_explicit_na("Other") %>% relevel(ref="White") 
@@ -91,6 +91,9 @@ TextSignals$cirrhosis_etiology %<>% is_in(107:113)%>% as.factor %>% fct_explicit
 TextSignals %<>% rename(prior_heavy_alcohol=alcohol_use, low_functional_capacity=functional_capacity, cirrhosis=cirrhosis_etiology)
 
 Signals %<>% left_join(TextSignals  , by=c("CPAPPatientID"="cpap_patient_id")) 
+
+Signals %<>% rename(CAD=`Coronary artery disease`, CKD=`Chronic kidney disease`)
+
 
 
 ## included procedure lists and categories
@@ -367,18 +370,21 @@ actfast_proc_filtered %<>%  mutate(SurgeryType = make_surg_categories(ICDX_PROCE
 
 
 ## replace NA with 0 in comorbidities and transform them to binary
-na_zero <- function(x) {  if_else(is.na(x), 0, x) }
+na_zero <- function(x) {  replace_na(x,0) }
+na_false <- function(x) {  replace_na(x,FALSE) }
 # comborbid_vars <- c("Coronary artery disease", "Congestive heart failure", "Atrial fibrillation or flutter history" , "COPD" , "Asthma" , "Peripheral artery disease" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA" ,"Hypertension")
-comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA")
-
-actfast_proc_filtered %<>%  mutate_at(vars(one_of(comborbid_vars)) , na_zero) %>% mutate_at(vars(one_of(comborbid_vars)) , as.logical) %>% mutate(CVA = `Cerebrovascular disease` | `Cerebrovascular disease, stroke, or TIA` | CVA | TIA) %>% mutate_at(vars(one_of( c("Hypertension", "Coronary artery disease", "Atrial fibrillation or flutter history","Chronic kidney disease") )), na_zero )
 
 
- 
+comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA", "CAD", "CKD")
+
+actfast_proc_filtered %<>%  mutate_at(vars(one_of(comborbid_vars)) , as.logical) %>%  mutate_at(vars(one_of(comborbid_vars)) , na_false) %>% mutate(CVA = `Cerebrovascular disease` | `Cerebrovascular disease, stroke, or TIA` | CVA | TIA) %>% mutate_at(vars(one_of( c("Hypertension", "CAD", "Atrial fibrillation or flutter history","CKD") )), na_false )
+
+## these leave as categories
+factor_vars <- c( "sex", "low_functional_capacity" )
 
 ## transform each hospitalization - 2733 hospitalizations
 
-actfast_proc_filtered %<>% group_by(PAN) %>% mutate( AD8 = max(AD8, na.rm=TRUE) , SBT = max(SBT, na.rm=TRUE) ) %>% mutate_at(vars(one_of(comborbid_vars)), max) %>% mutate( AbnCog =  case_when(
+actfast_proc_filtered %<>% group_by(PAN) %>% mutate( AD8 = max(AD8, na.rm=TRUE) , SBT = max(SBT, na.rm=TRUE) ) %>% mutate_at(vars(one_of(comborbid_vars)), max)%>% mutate_at(vars(one_of(factor_vars)), last) %>% mutate( AbnCog =  case_when(
     is.na(AD8) & is.na(SBT) ~ NA ,
     is.na(AD8) ~ SBT>=5 ,
     is.na(SBT) ~ AD8>=2 ,
@@ -446,6 +452,7 @@ hosp_proc %>% summarize(
 
 # hosp_proc %>% filter(!is.na(dc_status)) %>% summarize(n_distinct(PAN))
 
+
 analysis_pipe <- . %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) %>% 
   summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
@@ -457,7 +464,7 @@ base_form <- "thisout ~ 0" %>% formula
 surg_vars <- colnames(hosp_proc) %>% grep(pattern="SType_", value=T)
 surg_form <- paste0(surg_vars, collapse=" + ")
 surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
-comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
+comorbid_form <- paste0(c(comborbid_vars, factor_vars) ,  collapse=" + ")
 year_vars <- colnames(hosp_proc) %>% grep(pattern = "year_", value=T)
 year_form <- paste0(year_vars, collapse = " + ")
 year_interact_form <- paste0(year_vars, ":AbnCog" , collapse=" + ")
