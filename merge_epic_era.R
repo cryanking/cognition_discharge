@@ -394,7 +394,7 @@ pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c(
 swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
 
-comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
+comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes","Sex", "ESRD","FunctionalCapacity" )
 
 
 ## surgery specific effects - build formulas externally because of the non-factor structure
