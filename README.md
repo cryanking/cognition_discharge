@@ -2,13 +2,21 @@
 This project is to identify the predictive value of preoperative cognition testing (called AD8 and SBT) for postoperative outcomes, including discharge to other than home, readmission within 30 days, ICU admission, length of stay, and several clinical outcomes. The analysis plan request is found in Analysis plan clinical outcomes 4.26.21 (1).docx
 
 ## TODO
-- add dialysis
-- add dyspnea?
-- add sex
-- residence -> homogenous?
-- ? functional status?
-- strange death rates: maybe not na_false in 2022 after merge
+- add dialysis to adjusters -> done
+- add functional status ~ dyspnea to adjusters -> done
+- add sex to adjusters -> done
+- residence -> homogenous? Not sure what I was looking for
+- strange death rates: maybe not na_false in 2022 after merge -> done
 - little's mcar test
+-- AD8 >3 is rare (2%), simlar SBT > 11
+Analysis: marginal diffference in proportions with CI, adjusted marginal diffference
+Analysis: CI on OR clustering on procedure category
+Ananlysis: absolute AUC with CI (plus confounder only model)
+Analysis: y-index PPV, NPC, S, S before and after adding CI
+Analysis: head map / table of both CI variables
+ -- risk attributable to interaction / interaction term CI
+ -- problem with joint measurement
+
 
 # Process
 - alternative_procedures.R
