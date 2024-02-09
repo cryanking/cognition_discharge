@@ -275,12 +275,17 @@ actfast_proc_late_filtered %<>% filter(!is.na(PAN))
 
 actfast_proc_filtered <- bind_rows(actfast_proc_late_filtered,actfast_proc_early_filtered)
 
+
 figure1 <- bind_rows(figure1 , data.frame(Stage="distinct hospitalizations w / qualifying procedures", N=actfast_proc_filtered$PAN %>% n_distinct, deltaN=NA_real_) )
 
 
 actfast_proc_filtered %<>% filter(CPAP_Date > AnestStart - lubridate::ddays(90))
 
 actfast_proc_filtered %<>% filter( difftime(CPAP_Date, DoS, units="days") %>% as.numeric %>% abs %>% is_less_than(1) )
+
+
+actfast_proc_filtered %>% select(PatientID, EMPI, AD8, SBT, Barthel, ethnicity ) %>% write_csv("/research/re_export_mv_asses.csv")
+
 
 figure1 <- bind_rows(figure1 , data.frame(Stage="preop eval w/i 90 days", N=actfast_proc_filtered$PAN %>% n_distinct, deltaN=NA_real_) )
 
