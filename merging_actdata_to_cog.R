@@ -380,7 +380,7 @@ na_false <- function(x) {  replace_na(x,FALSE) }
 # comborbid_vars <- c("Coronary artery disease", "Congestive heart failure", "Atrial fibrillation or flutter history" , "COPD" , "Asthma" , "Peripheral artery disease" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA" ,"Hypertension")
 
 
-comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA", "CAD", "CKD")
+comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA", "CAD", "CKD", "dialysis_history")
 
 actfast_proc_filtered %<>%  mutate_at(vars(one_of(comborbid_vars)) , as.logical) %>%  mutate_at(vars(one_of(comborbid_vars)) , na_false) %>% mutate(CVA = `Cerebrovascular disease` | `Cerebrovascular disease, stroke, or TIA` | CVA | TIA) %>% mutate_at(vars(one_of( c("Hypertension", "CAD", "Atrial fibrillation or flutter history","CKD") )), na_false )
 
@@ -626,7 +626,7 @@ hosp_proc %<>% left_join( mortality_data , by = c("EMPI" = "MPI") )
 ## add a window for death for unrecognized hospice
 ## note that in R NA | TRUE is correctly TRUE
 hosp_proc %<>% mutate(death = na_false( DATE_OF_DEATH < DISCHARGE_DATE + ddays(2) ) | na_false(DATE_OF_DEATH < Surgery_Date + ddays(30) ) | na_false(dc_status=="hospice or death"))
-hosp_proc %<>% mutate(death = if_else(is.na(death), FALSE, death ) )
+hosp_proc %<>% mutate(death = if_else(is.na(death), FALSE, death ) ) %>% mutate(dc_status = if_else(death==TRUE , "hospice or death" , dc_status) )
 
 
 analysis_pipe <- . %>% mutate(thisout=death) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) %>% summary %>% extract2("coefficients") %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-`z value`)
