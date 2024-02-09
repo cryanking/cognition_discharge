@@ -13,9 +13,9 @@ date: "`r format(Sys.time(), '%B %d, %Y')`"
 header-includes:
     - \usepackage{colortbl}
 ---
-<!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/output/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -e 'rmarkdown::render("/code/report_epic_html.Rmd", output_dir="/output/")'
+<!-- docker run -v '/mnt/ris/lavanya/cognition_check/:/research/'  -v '/home/christopherking/gitdirs/cognition_discharge/:/code/' cryanking/cognitioncheck:1.1 R -e 'rmarkdown::render("/code/report_epic_html.Rmd", output_dir="/research/")'
 
-LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/output/ /home/christopherking/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=16GB] span[hosts=1]' -M 16GB -q general -a 'docker(cryanking/cognitioncheck:1.1)' R  -e 'rmarkdown::render(input="/code/report_epic_html.Rmd", output_dir="/output/")'
+LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/lavanya/cognition_check/:/research/ /home/christopherking/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=16GB] span[hosts=1]' -M 16GB -q general -a 'docker(cryanking/cognitioncheck:1.1)' R  -e 'rmarkdown::render(input="/code/report_epic_html.Rmd", output_dir="/research/")'
 
 -->
 ```{r setup, include=FALSE}
@@ -33,8 +33,8 @@ library("tableone")
 library(knitr)
 library(dplyr)
 # knitr::opts_chunk$set(dev = 'pdf')
-merged_data2 <- readRDS("/output/merged_data2.RDS" )
-load(file="/output/cognition_cache_epic.rda")
+merged_data2 <- readRDS("/research/merged_data2.RDS" )
+load(file="/research/cognition_cache_epic.rda")
 # cis_inter_year %>% mutate( value = if_else(YEAR=="All Epic", Estimate, value ) , `2.5 %`  )
 # cis_inter_year %<>% mutate( value = coalesce(Estimate, value ) , `2.5 %`= coalesce(`2.5 %`, X2.5..), `97.5 %`= coalesce(`97.5 %`, X97.5..)  ) %>% select(YEAR, value, `2.5 %`, `97.5 %`)
 cis_inter_year %<>%  select(YEAR, value, `2.5 %`, `97.5 %`)
@@ -47,7 +47,7 @@ year_totals <- data.frame(year_totals)
   cis_inter_year %<>% left_join(year_totals, by="YEAR")
 
 pre_epic_data <- new.env()
-load(file="/output/cognition_cache.rda", envir=pre_epic_data)
+load(file="/research/cognition_cache.rda", envir=pre_epic_data)
 if( "Estimate" %in% colnames(pre_epic_data$cis_inter_year)) {
 pre_epic_data$cis_inter_year %<>% mutate( value = coalesce(Estimate, value ) , `2.5 %`= coalesce(`2.5 %`, X2.5..), `97.5 %`= coalesce(`97.5 %`, X97.5..)  ) %>% select(YEAR, value, `2.5 %`, `97.5 %`)
 } else {
@@ -55,8 +55,104 @@ pre_epic_data$cis_inter_year %<>%  select(YEAR, value, `2.5 %`, `97.5 %`)
 }
 
 
-hosp_proc <- readRDS("/output/merged_data.RDS" )
+hosp_proc <- readRDS("/research/merged_data.RDS" )
 hosp_proc %<>% mutate(year=lubridate::year(AnestStart) )
+
+
+#### interaction analysis
+
+## upper square - the AND criteria (meeting both thresholds)
+double_thresh_sum<- . %>% na_zero %>% apply(1, . %>% rev %>% cumsum %>% rev) %>% apply(1, . %>% rev %>% cumsum %>% rev)
+
+## upper square - the or criteria (meeting either thresholds)
+single_thresh_sum <- function(x) {x<- na_zero(x); sum(x, na.rm=T) - apply(apply(x, 1, cumsum), 1, cumsum)  }
+
+merged_data2%>% mutate( AD8 = pmin(AD8, 3) %>% as.integer, SBT = pmin(SBT, 11)%>% as.integer, not_home = dc_home) %>%
+  mutate(AD8 = if_else(is.finite(AD8), AD8, NA_integer_ ) , SBT = if_else(is.finite(SBT), SBT, NA_integer_ ) ) %>%
+  group_by(AD8, SBT) %>% summarize(not_home=sum(not_home), n1=n() ) %>% ungroup -> events_rates
+  
+events_rates %>% mutate(not_home= not_home/n1)%>% 
+  filter(n1>10) %>% pivot_wider(values_from="not_home", names_from="SBT", id_cols="AD8", names_prefix="SBT")  -> raw_rates
+
+raw_rates %>% write_csv("/research/outputs/sup_nonlinear_raw_epic.csv")  
+
+png("/research/outputs/sup_nonlinear_raw_epic.png", res=300, width=4, height=4, units="in")
+heatmap(raw_rates[,-1] %>% as.matrix, Colv = NA, Rowv = NA, labRow=raw_rates[,1] %>% unlist, revC=T, ylab="AD8", scale="none")
+dev.off()
+
+events_rates %>% 
+  pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT")  -> raw_rates
+
+raw_rates %>% write_csv("/research/outputs/sup_nonlinear_raw_n_epic.csv")  
+
+png("/research/outputs/sup_nonlinear_raw_n_epic.png", res=300, width=4, height=4, units="in")
+heatmap(raw_rates[,-1] %>% as.matrix %>% (function(x){x/sum(x,na.rm=T)}), Colv = NA, Rowv = NA, labRow=raw_rates[,1] %>% unlist, revC=T, ylab="AD8", scale="none")
+dev.off()
+
+
+## two ways to handle unmeasured -> treated like a low number -> move to top
+events_rates %>% pivot_wider(values_from="not_home", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)   -> numerator 
+
+events_rates %>% pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)  -> denominator 
+
+round((numerator %>% select(-AD8) %>% as.matrix %>% single_thresh_sum) / (denominator %>% select(-AD8)%>% as.matrix %>% single_thresh_sum), 2)  %>% as_tibble %>% mutate(AD8=c(NA,0, seq.int(3))) %>% relocate(AD8) %>% write_csv("/research/outputs/sup_nonlinear_raw_cum_or_thresh_epic.csv")  
+
+png("/research/outputs/sup_nonlinear_raw_cum_thresh_or_epic.png", res=300, width=4, height=4, units="in")
+((numerator %>% select(-AD8) %>% as.matrix %>% single_thresh_sum) / (denominator %>% select(-AD8)%>% as.matrix %>% single_thresh_sum)) %>%heatmap( Colv = NA, Rowv = NA  %>% unlist, revC=T, ylab="AD8", scale="none", labRow= c(0, seq.int(3)),NA)
+dev.off()
+
+((numerator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum ) /  (denominator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum) ) %>% round(2) %>% as_tibble %>% mutate(AD8=c(NA,0, seq.int(3))) %>% relocate(AD8) %>% write_csv("/research/outputs/sup_nonlinear_raw_cum_thresh_epic.csv") 
+
+
+png("/research/outputs/sup_nonlinear_raw_cum_thresh_epic.png", res=300, width=4, height=4, units="in")
+((numerator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum) /  (denominator %>% as.matrix %>% `[`(,-1) %>%double_thresh_sum ) )  %>%heatmap( Colv = NA, Rowv = NA  %>% unlist, revC=T, ylab="AD8", scale="none", labRow= c(NA,0, seq.int(3)))
+dev.off()
+
+
+
+hosp_proc %>% mutate( AD8 = pmin(AD8, 3) %>% as.integer, SBT = pmin(SBT, 11)%>% as.integer, not_home = dc_status!="home") %>%
+  mutate(AD8 = if_else(is.finite(AD8), AD8, NA_integer_ ) , SBT = if_else(is.finite(SBT), SBT, NA_integer_ ) )  %>% group_by(AD8, SBT) %>% summarize(not_home=sum(not_home), n1=n() ) %>% ungroup  -> events_rates
+  
+## drop out rate with less than 10 denominator
+events_rates %>% mutate(not_home= not_home/n1)%>% 
+  filter(n1>10) %>% pivot_wider(values_from="not_home", names_from="SBT", id_cols="AD8", names_prefix="SBT")  -> raw_rates
+
+raw_rates %>% write_csv("/research/outputs/sup_nonlinear_raw.csv")  
+
+png("/research/outputs/sup_nonlinear_raw.png", res=300, width=4, height=4, units="in")
+heatmap(raw_rates[,-1] %>% as.matrix, Colv = NA, Rowv = NA, labRow=raw_rates[,1] %>% unlist, revC=T, ylab="AD8", scale="none")
+dev.off()
+
+events_rates %>% 
+  pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT")  -> raw_rates
+
+raw_rates %>% write_csv("/research/outputs/sup_nonlinear_raw_n.csv")  
+
+png("/research/outputs/sup_nonlinear_raw_n.png", res=300, width=4, height=4, units="in")
+heatmap(raw_rates[,-1] %>% as.matrix %>% (function(x){x/sum(x,na.rm=T)}), Colv = NA, Rowv = NA, labRow=raw_rates[,1] %>% unlist, revC=T, ylab="AD8", scale="none")
+dev.off()
+
+
+
+## what is the rate at each possible set of thresholds? 
+## two ways to handle unmeasured -> treated like a low number -> move to top
+events_rates %>% pivot_wider(values_from="not_home", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)   -> numerator 
+
+events_rates %>% pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)  -> denominator 
+
+round((numerator %>% select(-AD8) %>% as.matrix %>% single_thresh_sum) / (denominator %>% select(-AD8)%>% as.matrix %>% single_thresh_sum), 2)  %>% as_tibble %>% mutate(AD8=c(NA,0, seq.int(3))) %>% relocate(AD8) %>% write_csv("/research/outputs/sup_nonlinear_raw_cum_or_thresh.csv")  
+
+png("/research/outputs/sup_nonlinear_raw_cum_or_thresh.png", res=300, width=4, height=4, units="in")
+((numerator %>% select(-AD8) %>% as.matrix %>% single_thresh_sum) / (denominator %>% select(-AD8)%>% as.matrix %>% single_thresh_sum)) %>%heatmap( Colv = NA, Rowv = NA  %>% unlist, revC=T, ylab="AD8", scale="none", labRow= c(0, seq.int(3)),NA)
+dev.off()
+
+((numerator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum ) /  (denominator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum) ) %>% round(2) %>% as_tibble %>% mutate(AD8=c(NA,0, seq.int(3))) %>% relocate(AD8) %>% write_csv("/research/outputs/sup_nonlinear_raw_cum_thresh.csv") 
+
+
+png("/research/outputs/sup_nonlinear_raw_cum_thresh_or.png", res=300, width=4, height=4, units="in")
+((numerator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum ) /  (denominator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum) ) %>%heatmap( Colv = NA, Rowv = NA  %>% unlist, revC=T, ylab="AD8", scale="none", labRow= c(0, seq.int(3)),NA)
+dev.off()
+
 
   hosp_proc  %>% pull("year") %>% table %>% addmargins -> year_totals
   names(year_totals) %<>% paste0("year_" , .)
@@ -102,7 +198,7 @@ sp <- ggplot(cis_inter_year2, aes(y=index, x=value)) +
        plot.background = element_rect(fill='transparent', color=NA) #transparent plot bg 
 )
 
-ggsave(filename="/output/testing_ggp.png", plot=sp, device="png", width=4.5, height=4, units="in")
+ggsave(filename="/research/testing_ggp.png", plot=sp, device="png", width=4.5, height=4, units="in")
 
 
 cis_inter$era <- 1
@@ -113,7 +209,7 @@ cis_inter %<>% mutate(surgfact = SurgeryType %>% factor %>% forcats::fct_relevel
 cis_inter %<>% mutate(yval=-surgfact - era/3 )
 
 
-setwd("/output/")
+setwd("/research/")
 png(file="forest_home_both_surgery.png", width=7, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
 plot(x=0, y=0, xlim=c(-6,3), ylim=c(-15, 0), type='n', axes=FALSE, ylab="", xlab="")
@@ -283,7 +379,7 @@ mutate(AbnCog =  AbnCog %>% factor( levels=c(FALSE, TRUE), labels=c("normal", "i
  rownames(x) <- rownames(x) %>% sub(pattern="= 1 (", replacement="(", fixed=T) %>% sub(pattern="= TRUE (", replacement="(", fixed=T)
 
  table_1_out_mv <- x[,setdiff(colnames(x), "test")]
-cbind(table_1_out_mv, table_1_out_ep) %>% write.csv("/output/table1.csv")
+cbind(table_1_out_mv, table_1_out_ep) %>% write.csv("/research/table1.csv")
 
 df_header <- c("Variable"=1, "Cohort 1" = 3, "Cohort 2" = 3)
 table_1_format <- kbl(cbind(table_1_out_mv, table_1_out_ep) , longtable = TRUE, caption="\\label{tab:desc}Descriptive statistics stratified by Cognition status. P-values for quantitative variables by Mann-Whitney U, factor variables by Fisher's exact test. CAD = Coronary artery disease, CHF = Congestive heart failure,  Diabetes = Diabetes mellitus,  COPD = Chronic obstructive pulmonary diseae, CKD = chronic kidney disease, CVA\\ (TIA\\ ) = history of stroke or transient ischemic attack,  dc\\_home = discharge to home, readmit  = readmission within 30 days, los = postoperative hospital length of stay computed from first qualifying procedure, death = death in hospistal or within 30 days of surgery") %>%kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
@@ -305,7 +401,7 @@ swap_pretty_names_mv <- . %>% left_join(pre_epic_data$pretty_names%>% as_tibble,
 
 merged_data2  %>%summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery Type', 'Cohort 2')) %>% left_join( 
 hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names_mv %>% set_colnames(c('Surgery Type', 'Cohort 1')) , by="Surgery Type") %>% arrange(-`Cohort 1`)  %>% select( 'Surgery Type', 'Cohort 1', 'Cohort 2') -> surg_count_split
-surg_count_split %>% write_csv("/output/surgery_counts.csv")
+surg_count_split %>% write_csv("/research/surgery_counts.csv")
 
 surg_count_split %>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
 
@@ -345,7 +441,7 @@ glm_results_mv %<>% mutate( rname = if_else(rname=="Stroke", "CVA", rname )) %>%
 glm_results_epic %<>% mutate( rname = if_else(rname=="post_aki_status", "AKI", rname ))
 
 glm_results_cb <- full_join(glm_results_mv, glm_results_epic, by="rname")
-glm_results_cb %>% write_csv( "/output/glm_results_comb.csv")
+glm_results_cb %>% write_csv( "/research/glm_results_comb.csv")
 df_header <- c("Variable"=1, "Cohort 1" = 2, "Cohort 2" = 2)
 
 glm_results_cb %>% set_colnames( c("Variable","Estimate", "p", "Estimate", "p") ) %>% kbl %>% kable_styling(latex_options =c("striped","hold_position", "repeat_header"))  %>% 
@@ -359,17 +455,17 @@ We found no convincing evidence of heterogeneity by type of surgery, although po
 A forest plot is presented in Figure \@ref(fig:figone).
 
 ```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to other-than-home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals"}
-knitr::include_graphics("/output/forest_home_epic_surgery.png")
+knitr::include_graphics("/research/forest_home_epic_surgery.png")
 ```
 
 A comparison of surgery-specific odds-ratios is presented below
 
 ```{r figonemerge, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="Odd-ratio for discharge to other-than-home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals, red=Epic, black =pre-Epic"}
-knitr::include_graphics("/output/forest_home_both_surgery.png")
+knitr::include_graphics("/research/forest_home_both_surgery.png")
 ```
 
 ```{r figonemerge2, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="Odd-ratio for discharge to other-than-home with impaired cogition by surgery type combined over eras. Dot = point estimate, lines 95 \\% confidence intervals"}
-knitr::include_graphics("/output/forest_home_merge_surgery.png")
+knitr::include_graphics("/research/forest_home_merge_surgery.png")
 ```
 
 
@@ -391,7 +487,7 @@ print(analysis_pipe_cv_output)
 ```
 
 ```{r figtwo, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to other-than-home with impaired cogition by year. Dot = point estimate, lines 95 \\% confidence intervals"}
-knitr::include_graphics("/output/testing_ggp.png")
+knitr::include_graphics("/research/testing_ggp.png")
 ```
 
 ## Combining Datasets
