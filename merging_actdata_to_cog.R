@@ -457,31 +457,6 @@ hosp_proc %>% summarize(
 
 # hosp_proc %>% filter(!is.na(dc_status)) %>% summarize(n_distinct(PAN))
 
-## what is the rate at each level? eyeballing an interaction term -> matrix and possible heatmap
-hosp_proc %>% mutate( AD8 = pmin(AD8, 3), SBT = pmin(SBT, 11), not_home = dc_status!="home") %>% group_by(AD8, SBT) %>% summarize(not_home=mean(not_home), n1=n() ) %>% ungroup %>% filter(n1>10) -> temp
-
-temp %>% pivot_wider(values_from="not_home", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBT-Inf`, everything() )
-
-## what is the rate at each possible set of thresholds? 
-hosp_proc %>% mutate( AD8 = pmin(AD8, 3), SBT = pmin(SBT, 11), not_home = dc_status!="home") %>% group_by(AD8, SBT) %>% summarize(not_home=sum(not_home), n1=n() ) %>% ungroup  -> temp
-
-## two ways to handle unmeasured -> treated like a low number -> move to top
-temp %>% pivot_wider(values_from="not_home", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBT-Inf`, everything() ) -> numerator 
-temp %>% pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBT-Inf`, everything() ) -> denominator 
-
-((numerator %>% as.matrix %>% `[`(-1,) %>% na_zero %>% apply(1, . %>% rev %>% cumsum %>% rev) %>% apply(1, . %>% rev %>% cumsum %>% rev)) /  (denominator %>% as.matrix %>% `[`(-1,) %>% na_zero %>% apply(1, . %>% rev %>% cumsum %>% rev) %>% apply(1, . %>% rev %>% cumsum %>% rev) )) %>% round(2)
-
-## or treat it like an OR condition -> move to end
-
-temp %>% mutate(AD8 = if_else(is.finite(AD8), AD8, Inf ))%>% mutate(SBT = if_else(is.finite(SBT), SBT, Inf ))  %>% pivot_wider(values_from="not_home", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(  starts_with("SBT") ) -> numerator 
-
-temp %>% mutate(AD8 = if_else(is.finite(AD8), AD8, Inf ))%>% mutate(SBT = if_else(is.finite(SBT), SBT, Inf ))  %>% pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(  starts_with("SBT")  ) -> denominator 
-
-numerator<- numerator[, order( sub(colnames(denominator), pattern="SBT", replacement="" ) %>% as.numeric) ]
-denominator<- denominator[, order( sub(colnames(denominator), pattern="SBT", replacement="" ) %>% as.numeric) ]
-
-((numerator %>% as.matrix %>% na_zero %>% apply(1, . %>% rev %>% cumsum %>% rev) %>% apply(1, . %>% rev %>% cumsum %>% rev)) /  (denominator %>% as.matrix  %>% na_zero %>% apply(1, . %>% rev %>% cumsum %>% rev) %>% apply(1, . %>% rev %>% cumsum %>% rev) )) %>% round(2)
-
 
 analysis_pipe <- . %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% 
   glm(data=., formula=myform,  family=binomial() ) %>% 
