@@ -75,7 +75,7 @@ TextSignals <- read_xlsx("2020_01_15_Gregory_Cognative_Dysfunction_Data.xlsx",
                             "numeric", "numeric", "numeric", "numeric", "numeric"))
 
 
-TextSignals %<>% select(one_of("CPAPPatientID", "sex", "Race", "Ethnicity", "Alcohol use", "Drinks/week", "Functional capacity", "Dialysis history", "Cirrhosis etiology", "Surgical Service") )
+TextSignals %<>% select(one_of("CPAPPatientID", "Sex", "Race", "Ethnicity", "Alcohol use", "Drinks/week", "Functional capacity", "Dialysis history", "Cirrhosis etiology", "Surgical Service") )
 
 TextSignals %<>% (janitor::clean_names)
 TextSignals$race %<>% as.factor %>% fct_other(keep=c("7","9")) %>% fct_recode(White="9", Black="7") %>% fct_explicit_na("Other") %>% relevel(ref="White") 
