@@ -43,6 +43,7 @@ mortality_data [, death_in_30 := survival_time < 30]
 preop_covariates <- merge(mortality_data, preop_covariates, by="orlogid", all.y=T)
 
 
+
 procedure_codes <- fread(paste0(update_root, "Report 4.csv"), sep=";" )
 
 merged_post <- fread(  paste0(update_root, "update_2022_deident/v.1/2022_new_epic_outcomes.csv" ) )
@@ -173,11 +174,12 @@ cog_dates <- cog_dates[MEASURE_NAME %chin% c("Short Blessed Total Score" , "AD8 
 ## filter to just the variables of interest
 merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score`, low_barthel=`Barthel index score`<100 , preop_los) ] %>% 
 merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>%
-merge(preop_covariates[, .(orlogid, death=fcoalesce(death_in_30, FALSE) , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) , HTN, Dementia_MildCognitiveImpairment) ] , by="orlogid" )
+merge(preop_covariates[, .(orlogid, death=fcoalesce(death_in_30, FALSE) , survival_time, RACE ,ESRD, Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) , HTN, Dementia_MildCognitiveImpairment) ] , by="orlogid" )
 ## i merge the discharge dates later, will transform the death dates to an outcome then
 merged_data <- merged_data[age>=64.5]
 
-
+merged_data[survival_time < postop_los +2, death:=TRUE  ]
+merged_data[ , survival_time:=NULL]
 
 figure1 <- data.frame(Stage="surgeries age > 65", N=merged_data$orlogid %>% uniqueN , deltaN=NA_real_)
 
@@ -337,6 +339,7 @@ merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, gut_codes, st
 merged_data2 %<>% merge(an_records[,.(AnestStart=an_start, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
+merged_data2[death==TRUE, dispo:="death"]
 
 figure1 <- rbind(figure1 , data.frame(Stage="eval w/i 90 days", N=merged_data2$orlogid %>% uniqueN , deltaN=NA_real_) )
 

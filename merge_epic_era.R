@@ -281,6 +281,7 @@ merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" 
 merged_data2 %<>% merge(preop_dates , by="orlogid")
 merged_data2 <- merged_data2[preopdate > AnestStart - ddays(90)]
 
+
 figure1 <- rbind(figure1 , data.frame(Stage="eval w/i 90 days", N=merged_data2$orlogid %>% uniqueN , deltaN=NA_real_) )
 
 merged_data2 %<>% merge(cog_dates , by="orlogid")
@@ -335,7 +336,9 @@ testing_data2 <- testing_data2[ , .(dist=min(dist))  , by="orlogid" ]
 merged_data2 <- merge(merged_data2, testing_data2 , by="orlogid", all.x=TRUE, all.y=FALSE)
 
 
-merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < dist + ddays(30), TRUE, default=FALSE) ]
+merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < pmin(dist + ddays(2),AnestStart+ddays(30), na.rm=T)  , TRUE, default=FALSE) ]
+merged_data2[death==TRUE, dc_home:=TRUE ]
+merged_data2[death==TRUE, dispo:="death"]
 
 merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, vats_codes)] %>% sapply(sum) -> code_counts
 # 
