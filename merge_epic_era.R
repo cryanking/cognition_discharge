@@ -1,6 +1,7 @@
 # docker run -v "/mnt/ris/ActFastData/:/research/" -v "/home/christopherking/gitdirs/cognition_discharge:/code" -v "/mnt/ris/lavanya/cognition_check/:/output" cryanking/cognitioncheck:1.1 R  -f /code/merge_epic_era.R
 
 #LSF_DOCKER_VOLUMES='/storage1/fs1/christopherking/Active/ActFastData/:/research/  /storage1/fs1/christopherking/Active/lavanya/cognition_check/:/output/ /home/lavanya/gitrepos/cognition_discharge:/code' bsub -G 'compute-christopherking' -n 2 -R 'rusage[mem=32GB] span[hosts=1]' -M 32GB -q general-interactive -Is -a 'docker(cryanking/cognitioncheck:1.1)' /bin/bash
+# for reasons that I think I uncovered at some point, the excel_sheets function fails
 #Digest: sha256:9b99f73d209fb61e18cd4829f7b01c039b6645484dd1c4fa79a20d7d809b7f1d
 
 library(data.table)
@@ -34,7 +35,7 @@ procedure_codes <- fread('/research/ActFast_Big/Epic Through 2020_11/Report 4.cs
 
 merged_post <- fread( "/research/Actfast_deident_epic/epic_outcomes.csv" )
 matching_ids <- fread( "/research/Actfast_reident_epic/epic_orlogid_codes.csv" )
-setnames(merged_post, "orlogid", "orlogid_encoded")
+# setnames(merged_post, "orlogid", "orlogid_encoded")
 
 exploratory_outcomes <- matching_ids[ , .(orlogid,orlogid_encoded) ][merged_post[ , .(orlogid_encoded, PNA, AF, post_aki_status, CVA, postop_trop_high, postop_vent_duration ) ] , on="orlogid_encoded"]
 exploratory_outcomes[, orlogid_encoded:= NULL]
@@ -84,7 +85,7 @@ smartdata <- smartdata[CUR_VALUE_DATETIME > lubridate::ymd("2018-08-31")]
 setnames(smartdata, "SMRTDTA_ELEM_VALUE" , "Value" )
 
 
-sheet_list <- readxl::excel_sheets("/research/sync_aw_dump/Anesthesia SDEs.xlsx")
+sheet_list <- readxl::excel_sheets('/research/sync_aw_dump/Anesthesia SDEs.xlsx')
 all_sde <- list()
 for(i in sheet_list) {all_sde <- c(all_sde, list(readxl::read_xlsx("/research/sync_aw_dump/Anesthesia\ SDEs.xlsx", sheet=i)))}
 all_sde %<>% lapply(function(x){ set_colnames(x,c("SDE", "oldName", "label" , "Name" , rep("....a", length=ncol(x)-4L ) ) )[-1,c(1,4)] })
@@ -116,7 +117,7 @@ cog_dates <- cog_dates[MEASURE_NAME %chin% c("Short Blessed Total Score" , "AD8 
 ## filter to just the variables of interest
 merged_data <- processed_preop_screen[, .(orlogid, AD8=`AD8 Dementia Score`, SBT=`Short Blessed Total Score`, low_barthel=`Barthel index score`<100 ) ] %>% 
 merge(admit_outcomes[ , .(orlogid,ICU,  postop_los, readmit=fcase(is.na(readmission_survival) , FALSE, readmission_survival>30, FALSE, default=TRUE ) ) ] , by="orlogid") %>%
-merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) , HTN) ] , by="orlogid" )
+merge(preop_covariates[, .(orlogid, death_date = `Patient Death Date` , RACE , Sex , age, COPD , CAD , CKD , CHF , CVA_Stroke , cancerStatus, Diabetes, FunctionalCapacity, AFIB, low_functional_capacity=FunctionalCapacity<3 , BMI=WEIGHT_IN_KG/((HEIGHT_IN_INCHES/39.3701)^2) , HTN, Dementia_MildCognitiveImpairment) ] , by="orlogid" )
 ## i merge the discharge dates later, will transform the death dates to an outcome then
 merged_data <- merged_data[age>=64.5]
 
@@ -170,18 +171,20 @@ gut_codes = c("0D[BTVD5][89ABEFGHKLMNPQ]"  )
 , prost_codes = c("0VT0" )
 , bladder_codes = c("0TTB")
 , ueavfist_codes = c("031[345678569ABCH]0[A-Z0-9][DF]","03WY0J","05WY0[JK]Z" )
-, vats_codes = c("0BT[CDFGHJK]4ZZ")
+, vats_codes = c("0BT[CDFGHJK]4Z[XZ]" , "0BB[CDFGHJKLNP][348]Z[XZ]")
 )
 # "51570", "51575", "51596", "51590", "51595", "51580", "51585", "51555", "51550", "51565", "51597"
 # , "36830" , "36818", "36818", "36819", "36821", "36833", "36832", "36825"
+
+
 
 cpt_codes <- readxl::read_xlsx("/research/sync_aw_dump/CPT codes.xlsx", skip=1)
 cpt_codes %<>% dplyr::filter(is.na(Exclude))
 cpt_codes <- as.data.frame(cpt_codes)
 setDT(cpt_codes)
 
-pattern_names <- data.table(code_names = names(code_patterns), Group= c(2,3,1,4,5,6,9,10,7,8,12,13,15,15,11 ))
-cpt_codes <- pattern_names[cpt_codes ,on="Group"]
+pattern_names <- data.table(code_names = names(code_patterns), Group= c(2,3,1,4,5,6,9,10,7,8,12,13,14,15,11 ))
+cpt_codes <- pattern_names[cpt_codes ,on="Group", nomatch=NULL]
 
 
 
@@ -215,7 +218,8 @@ code_patterns$prost_codes <- c(code_patterns$prost_codes, cpt_code_pattern[cpt_c
 
 code_patterns$bladder_codes <- c(code_patterns$bladder_codes, cpt_code_pattern[cpt_code_pattern$group==14 , "code", drop=TRUE] ) %>% unique
 
-code_patterns$ueavfist_codes <- c(code_patterns$ueavfist_codes, cpt_code_pattern[cpt_code_pattern$group==15 , "code", drop=TRUE] ) %>% unique
+# code_patterns$ueavfist_codes <- c(code_patterns$ueavfist_codes, cpt_code_pattern[cpt_code_pattern$group==15 , "code", drop=TRUE] ) %>% unique
+code_patterns$ueavfist_codes <- NULL ## not interested in this group
 
 code_patterns$vats_codes <- c(code_patterns$vats_codes, cpt_code_pattern[cpt_code_pattern$group==11 , "code", drop=TRUE] ) %>% unique
 
@@ -262,7 +266,7 @@ for( thisset in names(code_patterns) ) {
 
 ## accumulate if a hospitalization has any matching codes
 procedure_codes[ , included := rowSums(.SD, na.rm = TRUE) > 0 , .SDcols=names(code_patterns) ]
-
+procedure_codes <- procedure_codes[is.finite(included)] [included >0 ]
 ## name consistency with older code
 # setnames(procedure_codes, names(code_patterns), names(code_patterns)%>% sub(pattern="_codes", replacement="") )
 
@@ -271,7 +275,7 @@ procedure_codes[ , included := rowSums(.SD, na.rm = TRUE) > 0 , .SDcols=names(co
 figure1 <- rbind(figure1 , data.frame(Stage="qualifying procedures", N=length(intersect(procedure_codes$orlogid , merged_data$orlogid ) ), deltaN=NA_real_) )
 
 
-merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes, dispo) ] , by="orlogid")
+merged_data2 <- merged_data %>% merge(procedure_codes[, .(orlogid, CSN, gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, vats_codes, dispo) ] , by="orlogid")
 
 merged_data2 %<>% merge(preop_covariates[,.(AnestStart, orlogid)], by="orlogid" )
 merged_data2 %<>% merge(preop_dates , by="orlogid")
@@ -333,7 +337,7 @@ merged_data2 <- merge(merged_data2, testing_data2 , by="orlogid", all.x=TRUE, al
 
 merged_data2[ , death := fcase(is.na(death_date), FALSE,  death_date < dist + ddays(30), TRUE, default=FALSE) ]
 
-merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, ueavfist_codes, vats_codes)] %>% sapply(sum) -> code_counts
+merged_data2[ , .(  gut_codes, stomach_codes, chole_codes, panc_codes, hyster_codes, lumbar_codes,shoulder_codes, hiatalHernia_codes, knee_codes, totalHip_codes, neph_codes,   prost_codes, bladder_codes, vats_codes)] %>% sapply(sum) -> code_counts
 # 
 #          gut_codes      stomach_codes        chole_codes         panc_codes 
 #                662                168                 81                174 
@@ -354,20 +358,49 @@ merged_data2$cancerStatus %<>% as.factor %>% fct_other(keep=c( "0", "2", "3", "4
 
 merged_data2 <- merge(merged_data2, exploratory_outcomes, by = "orlogid", all.x=TRUE)
 
-pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "AV fistula", "VATS" )
+encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
+  if (!is.factor(x)) {
+      x <- as.factor(x)
+  }
+  encoding_matrix <- contrasts(x, contrasts = FALSE)
+  encoded_data <- encoding_matrix[as.integer(x),]
+  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
+  encoded_data
+}
+
+merged_data2$year <- format(merged_data2$AnestStart, format= "%Y")
+
+merged_data2 <- data.table(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% data.table)
+
+saveRDS(merged_data2, "/output/merged_data_epic_1.RDS" )
+
+other_data <- readRDS("/output/merged_data2022.RDS")
+setnames(other_data,  "CVA(TIA)", "CVA_Stroke")    
+
+merged_data2 <- rbind(merged_data2, other_data, fill=T)
+for( thisvar in colnames(merged_data2 ) %>% grep(pattern="year_", value=T)  ) {
+  set(merged_data2, j=thisvar, i= which(is.na(merged_data2[[thisvar]] ) ), 0)
+}
+
+figure1b <- readRDS( "/output/figure1_2022.RDS" )
+
+figure1$N <- figure1$N + figure1b$N
+
+
+pretty_names <- c("intestinal", "gastric", "cholecystectomy", "pancreatic", "hysterectomy", "lumbar fusion", "total shoulder", "lap hiatal hernia", "total knee", "total hip", "nephrectomy", "prostatectomy", "cystectomy", "VATS" )
 
 pretty_names <- cbind(pretty_names , names(code_patterns)  ) %>% set_colnames(c("pretty_name", "SurgeryType"))
 
 swap_pretty_names <- . %>% left_join(pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
 
-comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes" )
+comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_Stroke" , "cancerStatus", "Diabetes","Sex", "ESRD","FunctionalCapacity" )
 
 
 ## surgery specific effects - build formulas externally because of the non-factor structure
 ## save these building blocks for various models
 base_form <- "thisout ~ 1" %>% formula
-surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
+surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T) %>% setdiff(c( "ueavfist_codes") ) ## decided to drop this group
 surg_form <- paste0(surg_vars, collapse=" + ")
 surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
 comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
@@ -411,19 +444,19 @@ analysis_pipe_cv <- function(x) {
 
   x2 <- x %>% mutate(thisout=dispo!="home")
   rs <- modelr::crossv_kfold(x2, k=100)
-  r1 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% 
-    map2_dbl(rs$test, function(.x, .y){
+  r1 <- map(rs$train, possibly(. %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ), otherwise=NA_real_) ) %>% 
+    map2_dbl(rs$test, possibly( function(.x, .y){
       response <- .y %>% as.data.frame %>% pull("thisout")
       if(n_distinct(response) > 1 ) {
         pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(SBT >= 5)) )  ) %>% auc } else {NA_real_}
-    } )
+    } , otherwise=NA_real_ ) )
 
-  r2 <- map(rs$train, . %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) ) %>% map2_dbl(rs$test, function(.x, .y){
+  r2 <- map(rs$train, possibly(. %>% as.data.frame %>% filter(!is.na(SBT) & ! is.na(AD8) ) %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) , otherwise=NA_real_ )) %>% map2_dbl(rs$test, possibly(function(.x, .y){
     response <- .y %>% as.data.frame %>% pull("thisout")
     if(n_distinct(response) > 1 ) {
       pROC::roc(direction = "<" , response=response, levels=c(FALSE,TRUE), predictor=predict(.x , newdata=.y %>% as.data.frame %>% mutate(AbnCog= as.numeric(AD8 >= 2)) )  ) %>% auc } else {NA_real_}
-  } )
-  t.test(na.omit(r1), na.omit(r2) )
+  } , otherwise=NA_real_ ))
+  possibly( t.test, otherwise=NA_real_)(na.omit(r1), na.omit(r2) )
 }
 
 global_age_spline <- bs(merged_data2$age, 3)
@@ -475,8 +508,8 @@ ci_los <- los_glm %>% ci_pipe
 
 base_form <- "thisout ~ 1" %>% formula
 surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
-surg_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ) , collapse=" + ")
-surg_interact_form <- paste0(surg_vars %>% setdiff(c("vats_codes", "ueavfist_codes") ),":AbnCog" ,  collapse=" + ")
+surg_form <- paste0(surg_vars %>% setdiff(c( "ueavfist_codes") ) , collapse=" + ")
+surg_interact_form <- paste0(surg_vars %>% setdiff(c( "ueavfist_codes") ),":AbnCog" ,  collapse=" + ")
 comorbid_form <- paste0(comborbid_vars ,  collapse=" + ")
 myform <- base_form %>% 
   update( paste0("~.+", surg_form) ) %>%
@@ -496,13 +529,17 @@ cis_inter %<>% mutate(SurgeryType =rname %>% sub(pattern=":.*", replacement="") 
 point_inter <- point_inter[cis_inter%>% transmute(width=`97.5 %` - `2.5 %`) %>% unlist %>%order(decreasing=TRUE),]
 
 cis_inter %<>% arrange( desc(`97.5 %` - `2.5 %` ) )
+cis_inter$value <-  point_inter$value
+
+
 
 temp <- dc_home_glm %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
+cis_inter %<>% bind_rows( tibble(SurgeryType = "Overall", `2.5 %` =temp[["2.5 %"]], `97.5 %`=temp[["97.5 %"]], value=coef_home[[2]] ))
 
 setwd("/output/")
 png(file="forest_home_epic_surgery.png", width=7, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-14, 0), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-15, 0), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter)) , labels = cis_inter$SurgeryType , pos=4)
 abline(v=0)
@@ -511,12 +548,12 @@ text(x=-6, y=0.2, labels="Surgery type", pos=4)
 text(x=-3, y=0.2, labels="more dc home", pos=4)
 text(x= 0, y=0.2, labels="less dc home", pos=4)
 
-points(x=point_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
+points(x=cis_inter$value, y=-seq.int(nrow(cis_inter)), pch=19  )
 arrows(y0=-seq.int(nrow(cis_inter)), y1=-seq.int(nrow(cis_inter)), x0=cis_inter[["2.5 %"]], x1=cis_inter[["97.5 %"]]  , length=0)
 
-text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
-points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
-arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
+# text(x=-5.9, y=-(nrow(cis_inter)+1) , labels = "overall" , pos=4)
+# points(x=coef_home[2], y=-(nrow(cis_inter)+1), pch=19 , col='red')
+# arrows(y0=-(nrow(cis_inter)+1), y1=-(nrow(cis_inter)+1), x0=temp[["2.5 %"]], x1=temp[["97.5 %"]]  , length=0, col='red')
 axis(1, at=log(c(.125, .25, .5, 1, 2, 4, 8 )), labels=c("1/8", "1/4", "1/2", "1", "2", "4", "8" )  , cex.axis=.9)
 axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
@@ -602,18 +639,6 @@ exploratory_outcomes_glm[["p val"]] %<>%  round(3) %>% format.pval(eps=.001)
 # exploratory_outcomes_glm $`Std. Error` <- round(exploratory_outcomes_glm$`Std. Error`, digits = 2)
 
 
-encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
-  if (!is.factor(x)) {
-      x <- as.factor(x)
-  }
-  encoding_matrix <- contrasts(x, contrasts = FALSE)
-  encoded_data <- encoding_matrix[as.integer(x),]
-  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
-  encoded_data
-}
-
-merged_data2$year <- format(merged_data2$AnestStart, format= "%Y")
-merged_data2 <- bind_cols(merged_data2, encode_onehot(merged_data2$year, colname_prefix = "year_") %>% as_tibble)
 
 base_form <- "thisout ~ 1" %>% formula
 surg_vars <- colnames(merged_data2) %>% grep(pattern="_codes", value=T)
@@ -673,11 +698,11 @@ cis_inter_year %<>%  arrange(YEAR)
            
 temp1 <- dc_home_glm_year %>% confint.default %>% as_tibble(rownames="rname") %>% filter(grepl(rname, pattern="AbnCog")) %>% select(-rname) %>% as.vector
 
-cis_inter_year %<>%  bind_rows( data.frame(value=coef_home_year[2], `97.5 %`=temp1[["97.5 %"]], `2.5 %`=temp1[["2.5 %"]], YEAR="All Epic"  ) )
+cis_inter_year %<>%  bind_rows( tibble(value=unlist(coef_home_year[2]), "97.5 %"=temp1[["97.5 %"]], "2.5 %"=temp1[["2.5 %"]], YEAR="All Epic"  ) )
 
-png(file="forest_home_epic_year.png", width=5, height=5, units="in", res=300)
+png(file="/output/forest_home_epic_year.png", width=5, height=5, units="in", res=300)
 par(mar=c(3,0,0,0))
-plot(x=0, y=0, xlim=c(-6,3), ylim=c(-4, 0.3), type='n', axes=FALSE, ylab="", xlab="")
+plot(x=0, y=0, xlim=c(-6,3), ylim=c(-6, 0.3), type='n', axes=FALSE, ylab="", xlab="")
 
 text(x=-5.9, y=-seq.int(nrow(cis_inter_year)) , labels = cis_inter_year$YEAR %>% sub(pattern="year_", replacement="")  , pos=4)
 # text(x=-15, y=0, labels="Months", pos=4)
@@ -728,7 +753,7 @@ save( file="cognition_cache_epic.rda" ,
   analysis_pipe_vu_output,
   analysis_pipe_cv_output,
   exploratory_outcomes_glm ,
-  cis_inter_year
+  cis_inter, cis_inter_year
   )
 
 
