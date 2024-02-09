@@ -9,15 +9,19 @@ This project is to identify the predictive value of preoperative cognition testi
 - residence -> homogenous? Not sure what I was looking for
 - strange death rates: maybe not na_false in 2022 after merge -> done
 - little's mcar test
--- AD8 >3 is rare (2%), simlar SBT > 11
+- why these threhsolds
+-- AD8 >3 is rare (2%), similar rate for SBT > 11, so not a ton of information
+DONE -- generated 2d table -> heatmap
 Analysis: marginal diffference in proportions with CI, adjusted marginal diffference
 Analysis: CI on OR clustering on procedure category
 Ananlysis: absolute AUC with CI (plus confounder only model)
 Analysis: y-index PPV, NPC, S, S before and after adding CI
-Analysis: head map / table of both CI variables
+Analysis: heat map / table of both CI variables
  -- risk attributable to interaction / interaction term CI
  -- problem with joint measurement
 
+Adding more adjusters -> numeric failure of vuong test for AD8 vs SBT
+ 
 # plan
 - bootstrap:
 - xgb with all covariates (default params or params leared on real data)

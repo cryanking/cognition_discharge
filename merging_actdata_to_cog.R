@@ -625,7 +625,7 @@ mortality_data <- read_csv("metav.csv" , col_types=cols( MPI = col_character(), 
 hosp_proc %<>% left_join( mortality_data , by = c("EMPI" = "MPI") )
 ## add a window for death for unrecognized hospice
 ## note that in R NA | TRUE is correctly TRUE
-hosp_proc %<>% mutate(death = DATE_OF_DEATH < DISCHARGE_DATE + ddays(2) | DATE_OF_DEATH < Surgery_Date + ddays(30) | dc_status=="hospice or death")
+hosp_proc %<>% mutate(death = na_false( DATE_OF_DEATH < DISCHARGE_DATE + ddays(2) ) | na_false(DATE_OF_DEATH < Surgery_Date + ddays(30) ) | na_false(dc_status=="hospice or death"))
 hosp_proc %<>% mutate(death = if_else(is.na(death), FALSE, death ) )
 
 
@@ -672,14 +672,14 @@ hosp_proc %>% analysis_pipe
 # there are two common ways to compare non-nested models for predictive value: vuong / clarke type tests and hold out samples
 
 analysis_pipe_vu <- function(x) {
-g1 <- x %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
-g2 <- x %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g1 <- x %>% filter(is.finite(SBT) & is.finite(AD8) ) %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(SBT >= 5)) %>% glm(data=., formula=myform,  family=binomial() ) 
+g2 <- x %>% filter(is.finite(SBT) & is.finite(AD8) ) %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AD8 >= 2)) %>% glm(data=., formula=myform,  family=binomial() ) 
 vuongtest(g1, g2)
 }
 
 analysis_pipe_cv <- function(x) {
 
-  x2 <- x %>% mutate(thisout=dc_status!="home")
+  x2 <- x %>% filter(is.finite(SBT) & is.finite(AD8) ) %>% mutate(thisout=dc_status!="home")
     ## produce a shared set of cross-validation folds - note that dplyr / magrittr do not automatically know how to turn the fold-by-ref into a dataframe for manipulation, but they seems to have added a glm method
   rs <- modelr::crossv_kfold(x2, k=100)
   ## train the first model on all folds, then evaluate it on the hold out data using AUROC as a critereon - note the wrapper since at low frequency / sample size an evaluation set can have no events
@@ -723,7 +723,7 @@ myform <- base_form %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+AbnCog" ) %>%
   update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
-analysis_pipe_vu_output <- hosp_proc  %>% analysis_pipe_vu
+analysis_pipe_vu_output <- try(hosp_proc  %>% analysis_pipe_vu)
 analysis_pipe_cv_output <- hosp_proc  %>% analysis_pipe_cv
 
 
