@@ -1,6 +1,14 @@
 # cognition_discharge
 This project is to identify the predictive value of preoperative cognition testing (called AD8 and SBT) for postoperative outcomes, including discharge to other than home, readmission within 30 days, ICU admission, length of stay, and several clinical outcomes. The analysis plan request is found in Analysis plan clinical outcomes 4.26.21 (1).docx
 
+# plan
+- bootstrap:
+- xgb with all covariates (default params or params leared on real data)
+- predict population at each level of ad8 and sbt -> heat map + table with CI
+- add heatmap of N = joint distribution, use arguments( Colv = NA, Rowv = NA) to avoid reordering
+-old docker image lacks xgboost, added
+
+
 # Process
 - alternative_procedures.R
 - pull_data.sh
