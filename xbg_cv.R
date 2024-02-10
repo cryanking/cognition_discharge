@@ -69,7 +69,7 @@ xgboost_cv <- function(data
   transformed_params <- lower_corner + (upper_corner-lower_corner)*evaluation_points[ which.min(eval_res[,2]), drop=TRUE]
   transformed_params <- dplyr:::coalesce(fixed_params,  transformed_params)
   transformed_params[c(1,3,8)] <- round(transformed_params[c(1,3,8)])
-  nrounds <- eval_res[which.min(eval_res[,2]),1]
+  transformed_params[3] <- nrounds <- eval_res[which.min(eval_res[,2]),1]
 
 
     local.model <- xgboost:::xgb.train(data=data, params=c(other_params, list(

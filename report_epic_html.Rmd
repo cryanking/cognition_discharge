@@ -189,16 +189,44 @@ events_rates %>% select(AD8, SBT, n1, not_home= imputedn) %>% thresh_rate_and_f 
 ## because xgb is multicore, there is minimal gain to further multicoring the outer procecess
 n_boot <- 500
 folds <- replicate((n_boot), sample.int(nrow(merged_data2), replace=TRUE ) )
+transformed_params <- cv_results_mv[[1]]
 
-bootfunction <- function(indicies, data, labels) {
-  local_model <- xgb.train( data[indicies, ] , labels[indicies], params= whole_model_params[1] )
-  results <- predict(local_model , data) 
+train_set <- hosp_proc %>% select(one_of(comborbid_vars, factor_vars, surg_vars, year_vars, "AD8", "SBT", "Age_at_CPAP") )
+
+temp <- train_set %>% mutate_all(as.numeric) %>% as.matrix
+temp[!is.finite(temp)] <- NA
+dtrain <- xgb.DMatrix(train$data, label=(hosp_proc$dc_status!="home" )%>% as.numeric)
+
+
+bootfunction <- function(indicies, dtrain) {
+  local_model <- xgb.train( data= xgboost::slice(dtrain ,indicies), 
+    params= list(
+      max_depth=transformed_params[1] 
+    , eta=transformed_params[2]
+    ,  min_child_weight=exp(transformed_params[4])
+    , gamma=transformed_params[5]
+    , subsample=transformed_params[6] 
+    , lambda=exp(transformed_params[7])
+    , num_parallel_tree=transformed_params[8] 
+    , objective = "binary:logistic"
+    , tree_method="auto"
+    , eval_metric="logloss"
+    )  , nrounds=transformed_params[3], verbose=0L )
+  results <- predict(local_model , dtrain) 
   return(results)
 }
 
 train_or_test <- apply( folds, 2, function(x) {seq.int(length(x)) %in% x } ) 
    
+predictions_mv_boot <- lapply(folds, bootfunction, dtrain )
+   
+temp <- train_set %>% select(-SBT) %>% select(-AD8) %>% mutate_all(as.numeric) %>% as.matrix
+temp[!is.finite(temp)] <- NA
+dtrain <- xgb.DMatrix(train$data, label=(hosp_proc$dc_status!="home" )%>% as.numeric)
 
+predictions_mv_boot_null <- lapply(folds, bootfunction, dtrain )
+
+   
 # 
 # events_rates %>% pivot_wider(values_from="imputedn", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)   -> numerator 
 # 
