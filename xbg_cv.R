@@ -1,3 +1,12 @@
+## Format for bounds:
+## 1: max_depth (int)
+## 2: eta
+## 3: nrounds (int) - because the model stores CV loss at each round, this is an upper limit only and is only used that way. 
+## 4: log of min_child_weight
+## 5: gamma
+## 6: subsample fraction
+## 7: log of lambda
+## 8: num_parallel_tree (int)
 xgboost_cv <- function(data
   , label=NULL
   , objective = "binary:logistic"
@@ -49,7 +58,7 @@ xgboost_cv <- function(data
     , tree_method=tree_method
     , eval_metric="logloss"
     ) ), verbose=0L, nfold= nfold, predictor="cpu_predictor")
-    ## this could be a one-liner in tidy/purrr, but this spares importing dplyr namespace
+
     get_this <- grep(local.model %>% extract2("evaluation_log") %>% colnames, pattern="test_logloss_mean")[1]
     eval_res[sobol_index,1] <- local.model %>% extract2("evaluation_log") %>% extract2(get_this)  %>% which.min 
     eval_res[sobol_index,2] <- local.model %>% extract2("evaluation_log") %>% extract2(get_this)  %>% min
