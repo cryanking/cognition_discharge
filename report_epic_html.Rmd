@@ -32,6 +32,9 @@ library(pROC)
 library("tableone")
 library(knitr)
 library(dplyr)
+source("/code/xbg_cv.R")
+na_zero <- function(x) {  replace_na(x,0) }
+na_false <- function(x) {  replace_na(x,FALSE) }
 # knitr::opts_chunk$set(dev = 'pdf')
 merged_data2 <- readRDS("/research/merged_data2.RDS" )
 load(file="/research/cognition_cache_epic.rda")
@@ -59,13 +62,153 @@ hosp_proc <- readRDS("/research/merged_data.RDS" )
 hosp_proc %<>% mutate(year=lubridate::year(AnestStart) )
 
 
-#### interaction analysis
+## Baseline xgb model
+comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA", "CAD", "CKD")
+factor_vars <- c( "sex", "low_functional_capacity" )
+year_vars <- colnames(hosp_proc) %>% grep(pattern = "year_", value=T)
 
+comborbid_vars <- setdiff(comborbid_vars, c("Cerebrovascular disease, stroke, or TIA", "TIA","Cerebrovascular disease" ))
+surg_vars <- colnames(hosp_proc) %>% grep(pattern="SType_", value=T)
+surg_form <- paste0(surg_vars, collapse=" + ")
+surg_interact_form <- paste0(surg_vars,":AbnCog" ,  collapse=" + ")
+comorbid_form <- paste0(c(comborbid_vars, factor_vars) ,  collapse=" + ")
+year_form <- paste0(year_vars, collapse = " + ")
+
+comborbid_vars %<>% gsub(pattern=" +", replacement="_")
+
+encode_onehot <- function(x, colname_prefix = "", colname_suffix = "") {
+  if (!is.factor(x)) {
+      x <- as.factor(x)
+  }
+  encoding_matrix <- contrasts(x, contrasts = FALSE)
+  encoded_data <- encoding_matrix[as.integer(x),]
+  colnames(encoded_data) <- paste0(colname_prefix, colnames(encoded_data), colname_suffix)
+  encoded_data
+}
+
+
+## for xgb variables that are binary + missing can be treated as numeric
 ## upper square - the AND criteria (meeting both thresholds)
-double_thresh_sum<- . %>% na_zero %>% apply(1, . %>% rev %>% cumsum %>% rev) %>% apply(1, . %>% rev %>% cumsum %>% rev)
+# double_thresh_sum<- . %>% na_zero %>% apply(1, . %>% rev %>% cumsum %>% rev) %>% apply(1, . %>% rev %>% cumsum %>% rev)
 
 ## upper square - the or criteria (meeting either thresholds)
-single_thresh_sum <- function(x) {x<- na_zero(x); sum(x, na.rm=T) - apply(apply(x, 1, cumsum), 1, cumsum)  }
+# single_thresh_sum <- function(x) {x<- na_zero(x); sum(x, na.rm=T) - apply(apply(x, 1, cumsum), 1, cumsum)  }
+
+## the cleverness with cumsum isn't exactly what I wanted, just write a loop
+thresh_rate_f <- function(x) {
+x$thresh_rate <- NA
+  for(i in na.omit(unique(x$AD8 ) ) ) {
+  for(j in na.omit(unique(x$SBT ))) {
+  x[ intersect( which(x$AD8 == i) , which(x$SBT==j) ),  "thresh_rate" ] <- x %>% filter((AD8 >= i) | (SBT >= j) ) %>% summarize(sum(not_home)/sum(n1)) %>% unlist  
+  }}
+  return(x)
+}
+
+thresh_rate_and_f <- function(x) {
+x$thresh_rate <- NA
+  for(i in na.omit(unique(x$AD8 ) ) ) {
+  for(j in na.omit(unique(x$SBT ))) {
+  x[ intersect( which(x$AD8 == i) , which(x$SBT==j) ),  "thresh_rate" ] <- x %>% filter((AD8 >= i) & (SBT >= j) ) %>% summarize(sum(not_home)/sum(n1)) %>% unlist  
+  }}
+  return(x)
+}
+
+
+comborbid_vars <- c("COPD" , "Congestive heart failure" , "Diabetes mellitus" , "Current cancer", "Cerebrovascular disease" , "Cerebrovascular disease, stroke, or TIA" , "CVA" , "TIA", "CAD", "CKD")
+factor_vars <- c( "sex", "low_functional_capacity" )
+year_vars <- colnames(hosp_proc) %>% grep(pattern = "year_", value=T)
+
+train_set <- hosp_proc %>% select(one_of(comborbid_vars, factor_vars, surg_vars, year_vars, "AD8", "SBT", "Age_at_CPAP") )
+
+temp <- train_set %>% mutate_all(as.numeric) %>% as.matrix
+temp[!is.finite(temp)] <- NA
+
+cv_results_mv <- xgboost_cv(label=(hosp_proc$dc_status!="home" )%>% as.numeric, data=temp %>% xgb.DMatrix , sobol_size=45, nrounds=50, eval_metric="auc" )
+
+whole_data_classifier <- cv_results_mv[[3]]
+
+
+hosp_proc %>% mutate( AD8 = pmin(AD8, 3) %>% as.integer, SBT = pmin(SBT, 11)%>% as.integer, not_home = dc_status!="home") %>%
+  mutate(AD8 = if_else(is.finite(AD8), AD8, NA_integer_ ) , SBT = if_else(is.finite(SBT), SBT, NA_integer_ ) )  %>% group_by(AD8, SBT) %>% summarize(not_home=sum(not_home), n1=n() ) %>% ungroup  -> events_rates
+  
+events_rates$imputed_rate <- NA_real_
+for( i in seq_len(nrow(events_rates))) {
+temp <- train_set %>% mutate(AD8=as.numeric(events_rates[i,"AD8"] ), SBT = as.numeric(events_rates[i,"SBT"] ) ) %>% mutate_all(as.numeric) %>% as.matrix
+temp[!is.finite(temp)] <- NA
+events_rates$imputed_rate[i] <- mean(predict(whole_data_classifier, temp))
+}
+events_rates %<>% mutate( imputedn = imputed_rate*n1)
+
+events_rates %>% select(AD8, SBT, n1, not_home= imputedn) %>% thresh_rate_f %>% filter(is.finite(AD8) & is.finite(SBT)) %>% pivot_wider(values_from="thresh_rate", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% write_csv("/research/outputs/sup_nonlinear_marginal_effect.csv") 
+
+events_rates %>% select(AD8, SBT, n1, not_home= imputedn) %>% thresh_rate_and_f %>% filter(is.finite(AD8) & is.finite(SBT)) %>% pivot_wider(values_from="thresh_rate", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% write_csv("/research/outputs/sup_nonlinear_marginal_effect_and.csv") 
+
+events_rates %>% pivot_wider(values_from="imputed_rate", names_from="SBT", id_cols="AD8", names_prefix="SBT")%>% write_csv("/research/outputs/sup_nonlinear_imputed_rates.csv") 
+
+# events_rates %>% pivot_wider(values_from="imputedn", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)   -> numerator 
+
+# events_rates %>% pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)  -> denominator 
+
+# round((numerator %>% select(-AD8) %>% as.matrix %>% single_thresh_sum) / (denominator %>% select(-AD8)%>% as.matrix %>% single_thresh_sum), 2)  %>% as_tibble %>% mutate(AD8=c(NA,0, seq.int(3))) %>% relocate(AD8) %>% filter(is.finite(AD8)) %>% select(-SBTNA) %>% write_csv("/research/outputs/sup_nonlinear_marginal_effect.csv") 
+
+comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA(TIA)" , "cancerStatus", "Diabetes","Sex", "ESRD","FunctionalCapacity" )
+
+surg_vars <- colnames(merged_data2) %>% grep(pattern="_code", value=T)
+year_vars <- colnames(merged_data2) %>% grep(pattern = "year_", value=T)
+
+train_set <- merged_data2 %>% select(one_of(comborbid_vars, surg_vars, year_vars, "AD8", "SBT", "age") )
+
+temp <- train_set %>% mutate_all(as.numeric) %>% as.matrix
+temp[!is.finite(temp)] <- NA
+
+cv_results_mv <- xgboost_cv(label=(merged_data2$dc_home )%>% as.numeric, data=temp %>% xgb.DMatrix , sobol_size=45, nrounds=50, eval_metric="auc" )
+
+whole_data_classifier <- cv_results_mv[[3]]
+
+
+merged_data2%>% mutate( AD8 = pmin(AD8, 3) %>% as.integer, SBT = pmin(SBT, 11)%>% as.integer, not_home = dc_home) %>%
+  mutate(AD8 = if_else(is.finite(AD8), AD8, NA_integer_ ) , SBT = if_else(is.finite(SBT), SBT, NA_integer_ ) ) %>%
+  group_by(AD8, SBT) %>% summarize(not_home=sum(not_home), n1=n() ) %>% ungroup -> events_rates
+
+events_rates$imputed_rate <- NA_real_
+for( i in seq_len(nrow(events_rates))) {
+temp <- train_set %>% mutate(AD8=as.numeric(events_rates[i,"AD8"] ), SBT = as.numeric(events_rates[i,"SBT"] ) ) %>% mutate_all(as.numeric) %>% as.matrix
+temp[!is.finite(temp)] <- NA
+events_rates$imputed_rate[i] <- mean(predict(whole_data_classifier, temp))
+}
+events_rates %<>% mutate( imputedn = imputed_rate*n1)
+events_rates %>% pivot_wider(values_from="imputed_rate", names_from="SBT", id_cols="AD8", names_prefix="SBT")%>% write_csv("/research/outputs/sup_nonlinear_imputed_rates_epic.csv") 
+
+events_rates %>% select(AD8, SBT, n1, not_home= imputedn) %>% thresh_rate_f %>% filter(is.finite(AD8) & is.finite(SBT)) %>% pivot_wider(values_from="thresh_rate", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% write_csv("/research/outputs/sup_nonlinear_marginal_effect_epic.csv") 
+
+events_rates %>% select(AD8, SBT, n1, not_home= imputedn) %>% thresh_rate_and_f %>% filter(is.finite(AD8) & is.finite(SBT)) %>% pivot_wider(values_from="thresh_rate", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% write_csv("/research/outputs/sup_nonlinear_marginal_effect_and_epic.csv") 
+
+
+## bootstrap accuracy with xgb
+## returns a list containing predictions, true values, SBT, AD8 -> post processing for things like PPV
+## because xgb is multicore, there is minimal gain to further multicoring the outer procecess
+n_boot <- 500
+folds <- replicate((n_boot), sample.int(nrow(merged_data2), replace=TRUE ) )
+
+bootfunction <- function(indicies, data, labels) {
+  local_model <- xgb.train( data[indicies, ] , labels[indicies], params= whole_model_params[1] )
+  results <- predict(local_model , data) 
+  return(results)
+}
+
+train_or_test <- apply( folds, 2, function(x) {seq.int(length(x)) %in% x } ) 
+   
+
+# 
+# events_rates %>% pivot_wider(values_from="imputedn", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)   -> numerator 
+# 
+# events_rates %>% pivot_wider(values_from="n1", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% select(AD8, `SBTNA`, everything() ) %>% arrange(!is.na(AD8), AD8)  -> denominator 
+# 
+# round((numerator %>% select(-AD8) %>% as.matrix %>% single_thresh_sum) / (denominator %>% select(-AD8)%>% as.matrix %>% single_thresh_sum), 2)  %>% as_tibble %>% mutate(AD8=c(NA,0, seq.int(3))) %>% relocate(AD8) %>% filter(is.finite(AD8)) %>% select(-SBTNA) %>% write_csv("/research/outputs/sup_nonlinear_marginal_effect_epic.csv") 
+
+
+#### interaction analysis - raw data
+
 
 merged_data2%>% mutate( AD8 = pmin(AD8, 3) %>% as.integer, SBT = pmin(SBT, 11)%>% as.integer, not_home = dc_home) %>%
   mutate(AD8 = if_else(is.finite(AD8), AD8, NA_integer_ ) , SBT = if_else(is.finite(SBT), SBT, NA_integer_ ) ) %>%
@@ -152,6 +295,11 @@ dev.off()
 png("/research/outputs/sup_nonlinear_raw_cum_thresh_or.png", res=300, width=4, height=4, units="in")
 ((numerator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum ) /  (denominator %>% as.matrix %>% `[`(,-1) %>% double_thresh_sum) ) %>%heatmap( Colv = NA, Rowv = NA  %>% unlist, revC=T, ylab="AD8", scale="none", labRow= c(0, seq.int(3)),NA)
 dev.off()
+
+
+#### next: 
+
+
 
 
   hosp_proc  %>% pull("year") %>% table %>% addmargins -> year_totals
