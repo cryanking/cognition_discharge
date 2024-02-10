@@ -10,17 +10,21 @@ This project is to identify the predictive value of preoperative cognition testi
 - strange death rates: maybe not na_false in 2022 after merge -> done
 - little's mcar test
 - why these threhsolds
--- AD8 >3 is rare (2%), similar rate for SBT > 11, so not a ton of information
-DONE -- generated 2d table -> heatmap
+  -- problem with joint measurement
+  -- AD8 >3 is rare (2%), similar rate for SBT > 11, so not a ton of information
+  DONE -- generated 2d table -> heatmap
+  DONE -- generated adjusted 2d table
+  NOTE: these results look weakerLR results: no to yes in abnormal is moving between the "midpoints" which is a larger difference potentially
+  DONE: add cv loop to reduce over-fitting
+  TODO: from N calculate the "modal" bad score -> use for marginal effect presentation
+  TODO: bootstrap loop for AUC
 Analysis: marginal diffference in proportions with CI, adjusted marginal diffference
 Analysis: CI on OR clustering on procedure category
 Ananlysis: absolute AUC with CI (plus confounder only model)
 Analysis: y-index PPV, NPC, S, S before and after adding CI
-Analysis: heat map / table of both CI variables
- -- risk attributable to interaction / interaction term CI
- -- problem with joint measurement
 
 Adding more adjusters -> numeric failure of vuong test for AD8 vs SBT
+Reviewing mortality data: there is no clear pattern in the difference between the eras. It is consistent across years and is spread across multiple surgery types. The old cohort's mortality data is the same as used in a prior project that was found to be problematic. https://pubmed.ncbi.nlm.nih.gov/32389391/  I verified that the updated data was used.
  
 # plan
 - bootstrap:
