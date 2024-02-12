@@ -1,11 +1,11 @@
 ## Format for bounds:
 ## 1: max_depth (int)
-## 2: eta
-## 3: nrounds (int) - because the model stores CV loss at each round, this is an upper limit only and is only used that way. 
-## 4: log of min_child_weight
-## 5: gamma
+## 2: eta = learning rate (0.3, 0 to 1, less -> less overfitting)
+## 3: nrounds (int) - because the model stores CV loss at each round, this is an upper limit only and is only used that way. ie it is profiled out
+## 4: log of min_child_weight [1, 0 to inf ~ information needed in each node, more -> more conservative]
+## 5: gamma = min split loss [0, 0 to inf required minimum improvement in loss to take a split, more -> more conservative ]
 ## 6: subsample fraction
-## 7: log of lambda
+## 7: log of lambda [1, 0 to inf l2 penality on weights ]
 ## 8: num_parallel_tree (int)
 xgboost_cv <- function(data
   , label=NULL
