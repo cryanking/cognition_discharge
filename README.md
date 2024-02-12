@@ -16,9 +16,8 @@ This project is to identify the predictive value of preoperative cognition testi
   DONE -- generated adjusted 2d table
   NOTE: these results look weakerLR results: no to yes in abnormal is moving between the "midpoints" which is a larger difference potentially
   DONE: add cv loop to reduce over-fitting
-  TODO: from N calculate the "modal" bad score -> use for marginal effect presentation
   TODO: bootstrap loop for AUC
-Analysis: marginal diffference in proportions with CI, adjusted marginal diffference
+DONE Analysis: marginal diffference in proportions with CI, adjusted marginal diffference
 Analysis: CI on OR clustering on procedure category
 Ananlysis: absolute AUC with CI (plus confounder only model)
 Analysis: y-index PPV, NPC, S, S before and after adding CI
