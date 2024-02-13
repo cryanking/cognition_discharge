@@ -269,8 +269,51 @@ boot_result <- boot(data=train_set_mv, statistic=test_stat, R=200, labels_in=(ho
 boot.ci(boot_result, type="basic")
 
 
+## the improved predictive performance
 
+base_form <- "thisout ~ 0" %>% formula
+surg_vars <- colnames(hosp_proc) %>% grep(pattern="SType_", value=T)
+surg_form <- paste0(surg_vars, collapse=" + ")
+comorbid_form <- paste0(c(comborbid_vars, factor_vars) ,  collapse=" + ")
+year_vars <- colnames(hosp_proc) %>% grep(pattern = "year_", value=T)
+year_form <- paste0(year_vars, collapse = " + ")
+global_age_spline <- bs(hosp_proc$Age_at_CPAP, 3)
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>%
+  update( paste0("~.+", surg_form) ) %>% 
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
+
+cogform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>%
+  update( paste0("~.+", surg_form) ) %>% 
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+AbnCog" ) %>%
+  update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
   
+test_stat_acc <- function(data, indicies)  {
+  dc_home_glm <- hosp_proc[indicies,] %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+  predict_null <- predict(dc_home_glm,holdout)
+
+  dc_home_glm_alt <- update(dc_home_glm , cogform)
+  holdout <- hosp_proc[-unique(indicies),] %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog))
+  predict_alt <- predict(dc_home_glm_alt,holdout)
+  
+  return(c( 
+    auc(predict_alt, holdout$thisout) ,
+    auc(predict_null, holdout$thisout) , 
+    auc(predict_alt, holdout$thisout) - auc(predict_null, holdout$thisout) , 
+    ## TODO: import cutpointr, -> j index maximizing threshold -> sens, spec, ppv, npv
+
+  ) )
+}
+
+boot_result_simple <- boot(data=hosp_proc, statistic=test_stat_acc, R=200)
+boot.ci(boot_result_simple, type="basic")
+
+## sandwich SE over surgeries
+
 
 
 ##### cohort 2
