@@ -4,7 +4,7 @@ library(modelr)
 library(xgboost)
 source("/code/xbg_cv.R")
 library(pROC)
-
+library(splines)
 
 
 ## this is getting unexpectedly near the upper bounds on many params (max depth, eta, nrounds, gamma). high eta, nrounds, depth -> want a bigger and more aggressive tree, high gamma -> only take splits closer to median (max of 5 pretty arbitrary)
@@ -264,20 +264,21 @@ test_stat <-function(data_in, indicies , labels_in) {
   nfold=5, params=transformed_params %>% as.list )[[1]][,2] %>% diff %>% return
 }
 
-boot_result <- boot(data=train_set_mv, statistic=test_stat, R=200, labels_in=(hosp_proc$dc_status!="home" )%>% as.numeric)
-######## TODO: write this result out
-boot.ci(boot_result, type="basic")
+boot_result <- boot(data=train_set_mv, statistic=test_stat, R=5000, labels_in=(hosp_proc$dc_status!="home" )%>% as.numeric)
 
+boot_result %>% saveRDS(file="/research/outputs/mv_ddml_boot.RDS")
+
+
+
+c(boot_result$t0, boot_result$t %>% colMeans, boot.ci(boot_result, type="basic")$basic[,c(4,5)]  ) %>% matrix(nrow=1) %>% set_colnames(c("whole_sample_difference","mean boot difference","lower_ci_boot", "upper_ci_boot")) %>% round(3) %>% as.data.frame %>% write_csv("/research/outputs/mv_ddml_boot.csv")
 
 ## the improved predictive performance
 
 base_form <- "thisout ~ 0" %>% formula
-surg_vars <- colnames(hosp_proc) %>% grep(pattern="SType_", value=T)
-surg_form <- paste0(surg_vars, collapse=" + ")
-comorbid_form <- paste0(c(comborbid_vars, factor_vars) ,  collapse=" + ")
-year_vars <- colnames(hosp_proc) %>% grep(pattern = "year_", value=T)
-year_form <- paste0(year_vars, collapse = " + ")
-global_age_spline <- bs(hosp_proc$Age_at_CPAP, 3)
+surg_form <- paste0(surg_vars_mv, collapse=" + ")
+year_form <- paste0(year_vars_mv, collapse = " + ")
+global_age_spline <- splines::bs(hosp_proc$Age_at_CPAP, 8)
+comorbid_form <- paste0(c(comborbid_vars_mv, factor_vars_mv) ,  collapse=" + ")
 
 myform <- base_form %>% 
   update( paste0("~.+", year_form) ) %>%
@@ -285,40 +286,116 @@ myform <- base_form %>%
   update( paste0("~.+", comorbid_form) ) %>%
   update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
 
-cogform <- base_form %>% 
-  update( paste0("~.+", year_form) ) %>%
-  update( paste0("~.+", surg_form) ) %>% 
-  update( paste0("~.+", comorbid_form) ) %>%
-  update( "~.+AbnCog" ) %>%
-  update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
+cogform <- myform %>%  update( "~.+AbnCog" ) 
+
+#   dc_home_glm <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+#   predict_null <- predict(dc_home_glm, newdata=hosp_proc %>% mutate(AbnCog= as.numeric(AbnCog)) , type="response")
+#   
+#   dc_home_glm_alt <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=update(myform , formula("~.+AbnCog") ) ,  family=binomial() ) 
+#   predict_alt <- predict(dc_home_glm_alt,hosp_proc %>% mutate(AbnCog= as.numeric(AbnCog))  , type="response" )
+#   
+#   cutpointr(x=predict_alt, class=hosp_proc$dc_status!="home" , metric=youden)
+#   cutpointr(x=predict_null, class=hosp_proc$dc_status!="home" , metric=youden)
   
 test_stat_acc <- function(data, indicies)  {
-  dc_home_glm <- hosp_proc[indicies,] %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
+  capture.output( 
+  {
+#   sink(file="/dev/null", type="message")
+  if(length(setdiff(indicies, seq.int(nrow(data)))) ==0 ) {
+  holdout <- data
+  } else {
+  holdout <- data[-unique(indicies),]  
+  }
+
+  dc_home_glm <- data[indicies,] %>% glm(data=., formula=myform,  family=binomial() ) 
   predict_null <- predict(dc_home_glm,holdout)
 
-  dc_home_glm_alt <- update(dc_home_glm , cogform)
-  holdout <- hosp_proc[-unique(indicies),] %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog))
+  dc_home_glm_alt <- glm(data=data[indicies,] , formula=cogform,  family=binomial() ) 
   predict_alt <- predict(dc_home_glm_alt,holdout)
   
-  return(c( 
-    auc(predict_alt, holdout$thisout) ,
-    auc(predict_null, holdout$thisout) , 
-    auc(predict_alt, holdout$thisout) - auc(predict_null, holdout$thisout) , 
-    ## TODO: import cutpointr, -> j index maximizing threshold -> sens, spec, ppv, npv
+  cutpoint_null <- cutpointr(x=predict_null, class=holdout$thisout , metric=youden)
+  cutpoint_null %<>% add_metric( list(ppv, npv, precision))
+  
+#   sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(predict(cutpoint_null, newdata=data.frame(x=predict_alt)), hosp_proc$dc_status!="home")), c("tn","fp","fn","tp") ) ) ) )
 
-  ) )
+  null_stats <- cutpoint_null %>% select(sensitivity,  specificity, ppv, npv, precision) %>% as.numeric
+  
+  cutpoint_alt <- cutpointr(x=predict_alt, class=holdout$thisout , metric=youden)
+  cutpoint_alt %<>% add_metric( list(ppv, npv, precision))
+  
+#   alt_stats <- sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(as.numeric(cutpoint_null$optimal_cutpoint) < predict_alt , holdout$thisout ) ), c("tn","fp","fn","tp") ) ) ) )
+  alt_stats <- cutpoint_alt %>% select(sensitivity,  specificity, ppv, npv, precision) %>% as.numeric
+  
+  results <- c( 
+    pROC::auc(response=holdout$thisout,predictor=predict_alt, levels=c(FALSE, TRUE) ) ,
+    pROC::auc(response=holdout$thisout,predictor=predict_null, levels=c(FALSE, TRUE) ) , 
+    pROC::auc(response=holdout$thisout,predictor=predict_alt, levels=c(FALSE, TRUE) ) - pROC::auc(response=holdout$thisout,predictor=predict_null, levels=c(FALSE, TRUE) ) , 
+    null_stats,
+    alt_stats,
+    alt_stats - null_stats
+  )
+  } 
+  , type="message")
+#   sink( type="message")
+  return( results)
 }
 
-boot_result_simple <- boot(data=hosp_proc, statistic=test_stat_acc, R=200)
-boot.ci(boot_result_simple, type="basic")
+boot_result_simple <- boot(data=hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
+
+boot_result_simple %>% saveRDS(file="/research/outputs/mv_binary_acc_boot.RDS")
+
+accuracy_summary <- cbind(boot_result_simple$t0[c(1,2, 3,14:18)],
+boot_result_simple$t[,c(1,2,3,14:18)] %>% colMeans,
+rbind(
+boot.ci(boot_result_simple, index=1, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=2, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=3, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=14, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=15, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=16, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=17, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=18, type="basic")$basic[,c(4,5)] )
+) %>% set_colnames(c("whole_sample_difference","mean out-of-bag difference","lower_ci_oob", "upper_ci_oob")) %>% round(3) %>% as.data.frame %>% set_rownames( c("auc",'sensitivity',  'specificity', 'ppv', 'npv', 'precision'))
+
+accuracy_summary %>% write_csv("/research/outputs/mv_bin_acc_summary.csv")
 
 ## sandwich SE over surgeries
 
+## are a meaningful fraction multiple surgeries? Will have to sub-sample
+## MV has already been sub-sampled (assigned in order of procedure code ranking in billing)
+hosp_proc %>% select(one_of(surg_vars_mv)) %>% as.matrix %>% rowSums %>% table
+
+temp_data <- hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% as.data.frame
+glm(data=temp_data, formula=cogform , family=binomial() ) -> ci_glm_mv
+
+surgery_v <- vcovCL(ci_glm_mv, cluster = ~SurgeryType , cadjust = FALSE, type="HC1")
+thistest <- coeftest(ci_glm_mv, surgery_v)
+cbind(thistest["AbnCog",, drop=FALSE] , confint(thistest,parm="AbnCog") ) %>% as.data.frame %>% write_csv("/research/outputs/mv_surg_sandwich.csv")
 
 
-##### cohort 2
 
-comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA(TIA)" , "cancerStatus", "Diabetes","Sex", "ESRD","FunctionalCapacity" )
+
+#######################
+#### cohort 2
+#######################
+
+
+# merged_data2 %>% select(one_of(surg_vars)) %>% as.matrix %>% rowSums %>% table
+## undo the one hot encoding, prefer the least common surgery type
+## could do this with an apply, slightly more clever with coalesce 
+surg_type <- merged_data2 %>% select(ends_with("_codes"))
+## order by column freq
+surg_type<-relocate(surg_type,names(sort(colSums(surg_type %>% as.matrix))))
+for(i in colnames(surg_type)) {
+  surg_type[[i]] <- if_else(surg_type[[i]], i, NA_character_ ) 
+}
+merged_data2[["surgType"]] <- do.call(coalesce,surg_type) 
+
+merged_data2 %<>% mutate( low_functional_capacity = na_false(low_functional_capacity) , ESRD=na_zero(ESRD) )
+
+comborbid_vars <- c("COPD" , "CAD" , "CKD" , "CHF" , "CVA_TIA" , "cancerStatus", "Diabetes","Sex", "ESRD","low_functional_capacity" )
+
+merged_data2 %<>% rename(CVA_TIA = `CVA(TIA)`)
 
 surg_vars <- colnames(merged_data2) %>% grep(pattern="_code", value=T)
 year_vars <- colnames(merged_data2) %>% grep(pattern = "year_", value=T)
@@ -376,7 +453,7 @@ events_rates %>% mutate(not_home= not_home/n1) %>%
   write_csv("/research/outputs/sup_nonlinear_raw_epic.csv")  
 
  ## unadjusted thresholds
-events_rates %>% mutate(not_home= not_home/n1) %>% 
+events_rates %>% select(AD8, SBT, n1, not_home) %>% 
 thresh_rate_f %>% 
 filter(is.finite(AD8) & is.finite(SBT)) %>% 
 pivot_wider(values_from="thresh_rate", names_from="SBT", id_cols="AD8", names_prefix="SBT") %>% 
@@ -387,9 +464,77 @@ events_rates %>%
   write_csv("/research/outputs/raw_n_epic.csv")  
 
   
-boot_result <- boot(data=train_set, statistic=test_stat, R=200, labels_in=label_in)
-######## TODO: write this result out
-boot.ci(boot_result, type="basic")
+boot_result <- boot(data=train_set, statistic=test_stat, R=5000, labels_in=label_in)
 
- ## recover from snippets: write out N in raw categories 
-  
+boot.ci(boot_result, type="basic")
+boot_result %>% saveRDS(file="/research/outputs/ep_ddml_boot.RDS")
+
+
+c(boot_result$t0, boot_result$t %>% colMeans, boot.ci(boot_result, type="basic")$basic[,c(4,5)]  ) %>% matrix(nrow=1) %>% set_colnames(c("whole_sample_difference","mean boot difference","lower_ci_boot", "upper_ci_boot")) %>% round(3) %>% as.data.frame %>% write_csv("/research/outputs/ep_ddml_boot.csv")
+
+
+base_form <- "thisout ~ 0" %>% formula
+surg_form <- paste0(surg_vars, collapse=" + ")
+year_form <- paste0(year_vars, collapse = " + ")
+global_age_spline <- splines::bs(merged_data2$age, 8)
+comorbid_form <- paste0(c(comborbid_vars) ,  collapse=" + ")
+
+myform <- base_form %>% 
+  update( paste0("~.+", year_form) ) %>%
+  update( paste0("~.+", surg_form) ) %>% 
+  update( paste0("~.+", comorbid_form) ) %>%
+  update( "~.+predict(global_age_spline,age)" ) 
+
+cogform <- myform %>%  update( "~.+AbnCog" ) 
+
+boot_result_simple <- boot(data=merged_data2 %>% mutate(thisout=dc_home  ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
+
+
+boot_result_simple %>% saveRDS(file="/research/outputs/ep_binary_acc_boot.RDS")
+
+accuracy_summary <- cbind(boot_result_simple$t0[c(1,2,3,14:18)],
+boot_result_simple$t[,c(1,2,3,14:18)] %>% colMeans,
+rbind(
+boot.ci(boot_result_simple, index=1, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=2, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=3, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=14, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=15, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=16, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=17, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=18, type="basic")$basic[,c(4,5)] )
+) %>% set_colnames(c("whole_sample_difference","mean out-of-bag difference","lower_ci_oob", "upper_ci_oob")) %>% round(3) %>% as.data.frame %>% set_rownames( c("auc",'sensitivity',  'specificity', 'ppv', 'npv', 'precision'))
+
+accuracy_summary %>% write_csv("/research/outputs/ep_bin_acc_summary.csv")
+
+## sandwich SE over surgeries
+
+
+temp_data <- merged_data2 %>% mutate(thisout=dc_home ) %>% mutate(AbnCog= as.numeric(AbnCog)) %>% as.data.frame
+glm(data=temp_data, formula=cogform , family=binomial() ) -> ci_glm_ep
+
+surgery_v <- vcovCL(ci_glm_ep, cluster = ~surgType , cadjust = FALSE, type="HC1")
+thistest <- coeftest(ci_glm_ep, surgery_v)
+cbind(thistest["AbnCog",, drop=FALSE] , confint(thistest,parm="AbnCog") ) %>% as.data.frame %>% write_csv("/research/outputs/ep_surg_sandwich.csv")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
