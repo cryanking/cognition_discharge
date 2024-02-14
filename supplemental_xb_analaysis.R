@@ -2,6 +2,7 @@ library("magrittr")
 library("tidyverse")
 library(modelr)
 library(xgboost)
+library(boot)
 source("/code/xbg_cv.R")
 library(pROC)
 library(splines)
@@ -264,7 +265,7 @@ test_stat <-function(data_in, indicies , labels_in) {
   nfold=5, params=transformed_params %>% as.list )[[1]][,2] %>% diff %>% return
 }
 
-boot_result <- boot(data=train_set_mv, statistic=test_stat, R=5000, labels_in=(hosp_proc$dc_status!="home" )%>% as.numeric)
+boot_result <- boot(data=train_set_mv, statistic=test_stat, R=1000, labels_in=(hosp_proc$dc_status!="home" )%>% as.numeric)
 
 boot_result %>% saveRDS(file="/research/outputs/mv_ddml_boot.RDS")
 
@@ -318,13 +319,13 @@ test_stat_acc <- function(data, indicies)  {
   
 #   sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(predict(cutpoint_null, newdata=data.frame(x=predict_alt)), hosp_proc$dc_status!="home")), c("tn","fp","fn","tp") ) ) ) )
 
-  null_stats <- cutpoint_null %>% select(sensitivity,  specificity, ppv, npv, precision) %>% as.numeric
+  null_stats <- cutpoint_null %>% select(sensitivity,  specificity, ppv, npv, precision,acc) %>% as.numeric
   
   cutpoint_alt <- cutpointr(x=predict_alt, class=holdout$thisout , metric=youden)
   cutpoint_alt %<>% add_metric( list(ppv, npv, precision))
   
 #   alt_stats <- sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(as.numeric(cutpoint_null$optimal_cutpoint) < predict_alt , holdout$thisout ) ), c("tn","fp","fn","tp") ) ) ) )
-  alt_stats <- cutpoint_alt %>% select(sensitivity,  specificity, ppv, npv, precision) %>% as.numeric
+  alt_stats <- cutpoint_alt %>% select(sensitivity,  specificity, ppv, npv, precision, acc) %>% as.numeric
   
   results <- c( 
     pROC::auc(response=holdout$thisout,predictor=predict_alt, levels=c(FALSE, TRUE) ) ,
@@ -340,23 +341,25 @@ test_stat_acc <- function(data, indicies)  {
   return( results)
 }
 
-boot_result_simple <- boot(data=hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
+boot_result_simple <- boot(data=hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=1000)
 
 boot_result_simple %>% saveRDS(file="/research/outputs/mv_binary_acc_boot.RDS")
 
-accuracy_summary <- cbind(boot_result_simple$t0[c(1,2, 3,14:18)],
-boot_result_simple$t[,c(1,2,3,14:18)] %>% colMeans,
+accuracy_summary <- cbind(boot_result_simple$t0[c(1,2, 3,9,15:21)],
+boot_result_simple$t[,c(1,2,3,9, 15:21)] %>% colMeans,
 rbind(
 boot.ci(boot_result_simple, index=1, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=2, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=3, type="basic")$basic[,c(4,5)] ,
-boot.ci(boot_result_simple, index=14, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=9, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=15, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=16, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=17, type="basic")$basic[,c(4,5)] ,
-boot.ci(boot_result_simple, index=18, type="basic")$basic[,c(4,5)] )
-) %>% set_colnames(c("whole_sample_difference","mean out-of-bag difference","lower_ci_oob", "upper_ci_oob")) %>% round(3) %>% as.data.frame %>% set_rownames( c("auc",'sensitivity',  'specificity', 'ppv', 'npv', 'precision'))
-
+boot.ci(boot_result_simple, index=18, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=19, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=20, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=21, type="basic")$basic[,c(4,5)] )
+) %>% set_colnames(c("whole_sample_difference","mean out-of-bag","lower_ci_oob", "upper_ci_oob")) %>% round(3) %>% as.data.frame %>% set_rownames( c("auc_alt", "auc_null", "auc","acc_alt","acc_null",'sensitivity',  'specificity', 'ppv', 'npv', 'precision','acc'))
 accuracy_summary %>% write_csv("/research/outputs/mv_bin_acc_summary.csv")
 
 ## sandwich SE over surgeries
@@ -464,7 +467,7 @@ events_rates %>%
   write_csv("/research/outputs/raw_n_epic.csv")  
 
   
-boot_result <- boot(data=train_set, statistic=test_stat, R=5000, labels_in=label_in)
+boot_result <- boot(data=train_set, statistic=test_stat, R=1000, labels_in=label_in)
 
 boot.ci(boot_result, type="basic")
 boot_result %>% saveRDS(file="/research/outputs/ep_ddml_boot.RDS")
@@ -487,23 +490,26 @@ myform <- base_form %>%
 
 cogform <- myform %>%  update( "~.+AbnCog" ) 
 
-boot_result_simple <- boot(data=merged_data2 %>% mutate(thisout=dc_home  ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
+boot_result_simple <- boot(data=merged_data2 %>% mutate(thisout=dc_home  ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=1000)
 
 
 boot_result_simple %>% saveRDS(file="/research/outputs/ep_binary_acc_boot.RDS")
 
-accuracy_summary <- cbind(boot_result_simple$t0[c(1,2,3,14:18)],
-boot_result_simple$t[,c(1,2,3,14:18)] %>% colMeans,
+accuracy_summary <- cbind(boot_result_simple$t0[c(1,2,3,9,15:21)],
+boot_result_simple$t[,c(1,2,3,9,15:21)] %>% colMeans,
 rbind(
 boot.ci(boot_result_simple, index=1, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=2, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=3, type="basic")$basic[,c(4,5)] ,
-boot.ci(boot_result_simple, index=14, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=9, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=15, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=16, type="basic")$basic[,c(4,5)] ,
 boot.ci(boot_result_simple, index=17, type="basic")$basic[,c(4,5)] ,
-boot.ci(boot_result_simple, index=18, type="basic")$basic[,c(4,5)] )
-) %>% set_colnames(c("whole_sample_difference","mean out-of-bag difference","lower_ci_oob", "upper_ci_oob")) %>% round(3) %>% as.data.frame %>% set_rownames( c("auc",'sensitivity',  'specificity', 'ppv', 'npv', 'precision'))
+boot.ci(boot_result_simple, index=18, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=19, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=20, type="basic")$basic[,c(4,5)] ,
+boot.ci(boot_result_simple, index=21, type="basic")$basic[,c(4,5)] )
+) %>% set_colnames(c("whole_sample_difference","mean out-of-bag","lower_ci_oob", "upper_ci_oob")) %>% round(3) %>% as.data.frame %>% set_rownames( c("auc_alt", "auc_null", "auc","acc_alt","acc_null",'sensitivity',  'specificity', 'ppv', 'npv', 'precision','acc'))
 
 accuracy_summary %>% write_csv("/research/outputs/ep_bin_acc_summary.csv")
 
