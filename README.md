@@ -18,9 +18,9 @@ This project is to identify the predictive value of preoperative cognition testi
   DONE: add cv loop to reduce over-fitting
   TODO: bootstrap loop for AUC
 DONE Analysis: marginal diffference in proportions with CI, adjusted marginal diffference
-Analysis: CI on OR clustering on procedure category
-Ananlysis: absolute AUC with CI (plus confounder only model)
-Analysis: y-index PPV, NPC, S, S before and after adding CI
+DONE: Analysis: CI on OR clustering on procedure category
+DONE: Ananlysis: absolute AUC with CI (plus confounder only model)
+DONE: Analysis: y-index PPV, NPC, S, S before and after adding CI
 
 Adding more adjusters -> numeric failure of vuong test for AD8 vs SBT
 Reviewing mortality data: there is no clear pattern in the difference between the eras. It is consistent across years and is spread across multiple surgery types. The old cohort's mortality data is the same as used in a prior project that was found to be problematic. https://pubmed.ncbi.nlm.nih.gov/32389391/  I verified that the updated data was used.
