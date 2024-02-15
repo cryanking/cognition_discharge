@@ -151,7 +151,7 @@ temp <- cis_inter %>% select(SurgeryType, surgfact) %>% unique( )
 text(x=-5.9, y=-temp$surgfact , labels = temp$SurgeryType , pos=4)
 abline(v=0)
 abline(h=-.1)
-text(x=-6, y=0.2, labels="Surgery type", pos=4)
+text(x=-6, y=0.2, labels="Surgery cat", pos=4)
 text(x=-3, y=0.2, labels="more dc home", pos=4)
 text(x= 0, y=0.2, labels="less dc home", pos=4)
 
@@ -176,17 +176,17 @@ cis_combined %<>% left_join(cis_inter %>% select(surgfact, SurgeryType) %>% uniq
 cis_combined  %<>% mutate(yval=-surgfact )
 
 # merged_data2 %>% select(-c("vats_codes", "ueavfist_codes"))
-merged_data2  %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery Type', 'N')) -> N_epic_surg
+merged_data2  %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery cat', 'N')) -> N_epic_surg
 
 merged_data2  %>% select(ends_with("codes")) %>% as.matrix %>% rowSums -> tempN
 
 pre_epic_data$swap_pretty_names <- . %>% left_join(pre_epic_data$pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
-hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% (pre_epic_data$swap_pretty_names) %>% set_colnames(c('Surgery Type', 'N')) -> N_mv_surg
+hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% (pre_epic_data$swap_pretty_names) %>% set_colnames(c('Surgery cat', 'N')) -> N_mv_surg
 
-bind_rows(N_mv_surg, N_epic_surg) %>% group_by(`Surgery Type`) %>% summarize(N=sum(N, na.rm=T)) -> N_surg
+bind_rows(N_mv_surg, N_epic_surg) %>% group_by(`Surgery cat`) %>% summarize(N=sum(N, na.rm=T)) -> N_surg
 
-cis_combined %<>% left_join(N_surg, by=c("SurgeryType" = "Surgery Type") )
+cis_combined %<>% left_join(N_surg, by=c("SurgeryType" = "Surgery cat") )
 cis_combined[16, "N"] <- nrow(hosp_proc) + nrow(merged_data2)
 
 png(file="forest_home_merge_surgery.png", width=7, height=5, units="in", res=300)
@@ -198,7 +198,7 @@ temp <- cis_combined %>% select(SurgeryType, surgfact) %>% unique( )
 text(x=-5.9, y=-temp$surgfact , labels = paste0(temp$SurgeryType, ", n=", cis_combined$N) , pos=4)
 abline(v=0)
 abline(h=-.1)
-text(x=-6, y=0.2, labels="Surgery type", pos=4)
+text(x=-6, y=0.2, labels="Surgery cat", pos=4)
 text(x=-3, y=0.2, labels="more dc home", pos=4)
 text(x= 0, y=0.2, labels="less dc home", pos=4)
 
@@ -210,7 +210,7 @@ axis(1, at=-4, labels="odds-ratio", lwd=0)
 dev.off()
 
 cis_inter_0 <- cis_inter %>% filter(era==1) %>% mutate(surgfact = SurgeryType %>% factor %>% forcats::fct_relevel("Overall", after=Inf) %>% as.integer)  %>% mutate(yval = -surgfact )
-cis_inter_0  %<>% left_join(N_epic_surg, by=c("SurgeryType" = "Surgery Type") )
+cis_inter_0  %<>% left_join(N_epic_surg, by=c("SurgeryType" = "Surgery cat") )
 cis_inter_0  [14, "N"] <- nrow(merged_data2)
 
 
@@ -223,7 +223,7 @@ temp <- cis_inter_0  %>% select(SurgeryType, surgfact) %>% unique( )
 text(x=-5.9, y=-temp$surgfact , labels = paste0(temp$SurgeryType, ", n=", cis_inter_0 $N) , pos=4)
 abline(v=0)
 abline(h=-.1)
-text(x=-6, y=0.2, labels="Surgery type", pos=4)
+text(x=-6, y=0.2, labels="Surgery cat", pos=4)
 text(x=-3, y=0.2, labels="more dc home", pos=4)
 text(x= 0, y=0.2, labels="less dc home", pos=4)
 
@@ -331,11 +331,11 @@ The frequency of each type of surgery is displayed in Table \@ref(tab:descType).
 
 swap_pretty_names_mv <- . %>% left_join(pre_epic_data$pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
-merged_data2  %>%summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery Type', 'Cohort 2')) %>% left_join( 
-hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names_mv %>% set_colnames(c('Surgery Type', 'Cohort 1')) , by="Surgery Type") %>% arrange(-`Cohort 1`)  %>% select( 'Surgery Type', 'Cohort 1', 'Cohort 2') -> surg_count_split
+merged_data2  %>%summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery cat', 'Cohort 2')) %>% left_join( 
+hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names_mv %>% set_colnames(c('Surgery cat', 'Cohort 1')) , by="Surgery cat") %>% arrange(-`Cohort 1`)  %>% select( 'Surgery cat', 'Cohort 1', 'Cohort 2') -> surg_count_split
 surg_count_split %>% write_csv("/research/surgery_counts.csv")
 
-surg_count_split %>% kbl( caption="\\label{tab:descType}Number of Procedures by Type")
+surg_count_split %>% kbl( caption="\\label{tab:descType}Number of Procedures by Category")
 
 ```
 
@@ -383,20 +383,20 @@ pack_rows("Exploratory outcomes", 5, nrow(glm_results_cb) ) %>%
 add_header_above( header = df_header)
 ```
 
-We found no convincing evidence of heterogeneity by type of surgery, although power for this question is limited by small sample sizes in some surgery types. A score test comparing models with and without interaction terms yielded a p-value of `r anova(inter_glm, dc_home_glm, test="Rao")  %>% select(starts_with("Pr"))  %>% extract2(2,1) %>% sprintf(fmt="%.3f")`
+We found no convincing evidence of heterogeneity by category of surgery, although power for this question is limited by small sample sizes in some surgery types. A score test comparing models with and without interaction terms yielded a p-value of `r anova(inter_glm, dc_home_glm, test="Rao")  %>% select(starts_with("Pr"))  %>% extract2(2,1) %>% sprintf(fmt="%.3f")`
 A forest plot is presented in Figure \@ref(fig:figone).
 
-```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to other-than-home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals"}
+```{r figone, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="\\label{fig:fig1}Odd-ratio for discharge to other-than-home with impaired cogition by surgery category. Dot = point estimate, lines 95 \\% confidence intervals"}
 knitr::include_graphics("/research/forest_home_epic_surgery.png")
 ```
 
 A comparison of surgery-specific odds-ratios is presented below
 
-```{r figonemerge, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="Odd-ratio for discharge to other-than-home with impaired cogition by surgery type. Dot = point estimate, lines 95 \\% confidence intervals, red=Epic, black =pre-Epic"}
+```{r figonemerge, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="Odd-ratio for discharge to other-than-home with impaired cogition by surgery category. Dot = point estimate, lines 95 \\% confidence intervals, red=Epic, black =pre-Epic"}
 knitr::include_graphics("/research/forest_home_both_surgery.png")
 ```
 
-```{r figonemerge2, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="Odd-ratio for discharge to other-than-home with impaired cogition by surgery type combined over eras. Dot = point estimate, lines 95 \\% confidence intervals"}
+```{r figonemerge2, echo=FALSE, fig.show="hold", warning=FALSE , message=FALSE, fig.keep="last", fig.cap="Odd-ratio for discharge to other-than-home with impaired cogition by surgery category combined over eras. Dot = point estimate, lines 95 \\% confidence intervals"}
 knitr::include_graphics("/research/forest_home_merge_surgery.png")
 ```
 
