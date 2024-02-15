@@ -71,7 +71,22 @@ cam_holder <- unique(cam_holder , by="orlogid")
 
 
 saveRDS(cam_holder, "/research2/residence_epic_1.rda")
+residence_data <- cam_holder
+library(splines)
+library(dplyr)
+setnames(merged_data2 ,"CVA(TIA)", "CVA_Stroke")
+## recreates the base reults
+base_glm <- glm(formula=dc_home_glm$formula, data=merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)), family=binomial() )
+## merged to residence
+merged_data3 <- merge(merged_data2 , residence_data, by="orlogid")
+setnames(merged_data3 , "Type of Residence", "Residence")
+restricted_glm <- glm(formula=dc_home_glm$formula, data=merged_data3 %>% filter(Residence  %like% "Private residence") %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)), family=binomial() ) 
 
+my_result <- function(x) {
+c(summary(x)$coef[ "AbnCog",], confint(x, parm="AbnCog") )
+}
+
+# glm(formula=update(dc_home_glm$formula, "~.+" , data=merged_data2 %>% mutate(thisout=dispo!="home") %>% mutate(AbnCog= as.numeric(AbnCog)), family=binomial() )
 
 
 
