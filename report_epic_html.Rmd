@@ -77,15 +77,6 @@ comborbid_vars %<>% gsub(pattern=" +", replacement="_")
 
 
 
-
-
-
-
-#### next: 
-
-
-
-
   hosp_proc  %>% pull("year") %>% table %>% addmargins -> year_totals
   names(year_totals) %<>% paste0("year_" , .)
 names(year_totals)[ grep(names(year_totals), pattern="Sum")  ] <- "All Pre-Epic"
@@ -177,13 +168,15 @@ cis_combined  %<>% mutate(yval=-surgfact )
 
 # merged_data2 %>% select(-c("vats_codes", "ueavfist_codes"))
 merged_data2  %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery cat', 'N')) -> N_epic_surg
+merged_data2  %>% group_by(AbnCog) %>% summarize(across(ends_with("codes") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% swap_pretty_names %>%  set_colnames(c('Surgery cat', 'N', 'N2'))%>% mutate(N= paste0(N, " (", round(N/sum(N)*100 ,1) ,")" ) , N2= paste0(N2, " (", round(N2/sum(N2)*100 ,1) ,")" )) -> N_epic_surg2
 
 merged_data2  %>% select(ends_with("codes")) %>% as.matrix %>% rowSums -> tempN
 
 pre_epic_data$swap_pretty_names <- . %>% left_join(pre_epic_data$pretty_names%>% as_tibble, by="SurgeryType") %>% select(-SurgeryType) %>% rename(SurgeryType=pretty_name) %>% select(SurgeryType, everything() )
 
+hosp_proc %>% group_by(AbnCog) %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% (pre_epic_data$swap_pretty_names) %>% set_colnames(c('Surgery cat', 'N', 'N2')) %>% mutate(N= paste0(N, " (", round(N/sum(N)*100 ,1) ,")" ) , N2= paste0(N2, " (", round(N2/sum(N2)*100 ,1) ,")" )) -> N_mv_surg2
 hosp_proc %>% summarize(across(starts_with("SType") , sum, na.rm=TRUE ) ) %>% t %>% as_tibble(rownames="SurgeryType") %>% (pre_epic_data$swap_pretty_names) %>% set_colnames(c('Surgery cat', 'N')) -> N_mv_surg
-
+bind_cols(N_mv_surg2, N_epic_surg2) %>% fwrite("/research/outputs/categories_for_t1.csv")
 bind_rows(N_mv_surg, N_epic_surg) %>% group_by(`Surgery cat`) %>% summarize(N=sum(N, na.rm=T)) -> N_surg
 
 cis_combined %<>% left_join(N_surg, by=c("SurgeryType" = "Surgery cat") )
