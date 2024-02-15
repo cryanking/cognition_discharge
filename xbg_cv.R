@@ -57,7 +57,7 @@ xgboost_cv <- function(data
     , objective = objective
     , tree_method=tree_method
     , eval_metric="logloss"
-    ) ), verbose=0L, nfold= nfold, predictor="cpu_predictor")
+    ) ), verbose=0L, nfold= nfold, predictor="cpu_predictor", nthread=nthread)
 
     get_this <- grep(local.model %>% extract2("evaluation_log") %>% colnames, pattern="test_logloss_mean")[1]
     eval_res[sobol_index,1] <- local.model %>% extract2("evaluation_log") %>% extract2(get_this)  %>% which.min 
@@ -83,7 +83,7 @@ xgboost_cv <- function(data
     , objective = objective
     , tree_method=tree_method
     , eval_metric=eval_metric
-    ) ) , nrounds=nrounds, verbose=0L,  watchlist=list(train=data), predictor="cpu_predictor")  
+    ) ) , nrounds=nrounds, verbose=0L,  watchlist=list(train=data), predictor="cpu_predictor", nthread=nthread)  
     
 
   return(list(transformed_params, eval_res, local.model))

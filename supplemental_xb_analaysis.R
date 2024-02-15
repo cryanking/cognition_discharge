@@ -6,6 +6,9 @@ library(boot)
 source("/code/xbg_cv.R")
 library(pROC)
 library(splines)
+library(cutpointr)
+library(sandwich)
+library(lmtest)
 
 
 ## this is getting unexpectedly near the upper bounds on many params (max depth, eta, nrounds, gamma). high eta, nrounds, depth -> want a bigger and more aggressive tree, high gamma -> only take splits closer to median (max of 5 pretty arbitrary)
@@ -109,7 +112,7 @@ if(FALSE) {
 cv_results_mv <- xgboost_cv(label=(hosp_proc$dc_status!="home" )%>% as.numeric, data=train_set_mv %>%   mutate(AD8 = 0., SBT=0.) %>% as.matrix %>% xgb.DMatrix , sobol_size=100, nrounds=50 , 
 upper_bounds= c(10L, .6, 15L, log(5), 8, .99 , log(10), 1L) , 
 lower_bounds = c(4L, .1,  5L, log(0.01), 0, .7  , log(.1) , 1L) , 
-gamma=0 , subsample=1)
+gamma=0 , subsample=1, nthread=8L)
 
 confounder_only_classifier_mv <- cv_results_mv[[3]]
 
@@ -141,14 +144,14 @@ ddml_estimator <- function(data, exposure, label, nfold, params, exposure_object
   
   for( fold_index in seq_len(nfold)){
     ## train the label model 
-    label_model[[fold_index]] <- xgb.train(data= xgb.DMatrix(data[as.integer(unlist(folds[-fold_index])) , ], label=label[as.integer(unlist(folds[-fold_index])) ] ), params=c(params, objective="binary:logistic"), nrounds)
+    label_model[[fold_index]] <- xgb.train(data= xgb.DMatrix(data[as.integer(unlist(folds[-fold_index])) , ], label=label[as.integer(unlist(folds[-fold_index])) ] ), params=c(params, objective="binary:logistic"), nrounds=nrounds,  nthread=8L)
     
     predicted_label[as.integer(folds[[fold_index]]) ] <- predict(label_model[[fold_index]],  xgb.DMatrix(data[as.integer(folds[[fold_index]]),] )  )
     ## train the (multid) exposure model
     exposure_model[[fold_index]] <- vector('list', length(exposure)) 
     
     for( exposure_index in seq_len(length(exposure))) {
-      exposure_model[[fold_index]][[exposure_index]] <- xgb.train(data= xgb.DMatrix(data[as.integer(unlist(folds[-fold_index])), ], label=exposure[[exposure_index]][as.integer(unlist(folds[-fold_index]))] ), params=c(params, objective=exposure_objective) , nrounds)
+      exposure_model[[fold_index]][[exposure_index]] <- xgb.train(data= xgb.DMatrix(data[as.integer(unlist(folds[-fold_index])), ], label=exposure[[exposure_index]][as.integer(unlist(folds[-fold_index]))] ), params=c(params, objective=exposure_objective) , nrounds=nrounds,  nthread=8L)
       
       predicted_exposure[[exposure_index]][as.integer(folds[[fold_index]]) ] <- predict(exposure_model[[fold_index]][[exposure_index]],  xgb.DMatrix(data[as.integer(folds[[fold_index]]),] )  )
     }
@@ -156,7 +159,7 @@ ddml_estimator <- function(data, exposure, label, nfold, params, exposure_object
   ## train the low-d model of residual outcomes vs residual exposure
   residual_exposure <- (exposure %>% as.data.frame %>% as.matrix) - (predicted_exposure %>% as.data.frame %>% as.matrix)
   colnames(residual_exposure ) <- names(exposure)
-  residual_model <- xgb.train(data= xgb.DMatrix( residual_exposure , label = label-predicted_label), params=params,  nrounds) 
+  residual_model <- xgb.train(data= xgb.DMatrix( residual_exposure , label = label-predicted_label), params=params,  nrounds=nrounds,  nthread=8L) 
   
   ## for the possible values of exposure
   exposure_levels <- exposure %>% as.data.frame %>% unique %>% arrange %>%  as.matrix 
@@ -265,7 +268,7 @@ test_stat <-function(data_in, indicies , labels_in) {
   nfold=5, params=transformed_params %>% as.list )[[1]][,2] %>% diff %>% return
 }
 
-boot_result <- boot(data=train_set_mv, statistic=test_stat, R=1000, labels_in=(hosp_proc$dc_status!="home" )%>% as.numeric)
+boot_result <- boot(data=train_set_mv, statistic=test_stat, R=5000, labels_in=(hosp_proc$dc_status!="home" )%>% as.numeric)
 
 boot_result %>% saveRDS(file="/research/outputs/mv_ddml_boot.RDS")
 
@@ -297,7 +300,13 @@ cogform <- myform %>%  update( "~.+AbnCog" )
 #   
 #   cutpointr(x=predict_alt, class=hosp_proc$dc_status!="home" , metric=youden)
 #   cutpointr(x=predict_null, class=hosp_proc$dc_status!="home" , metric=youden)
-  
+ ## return, note that on full sample all oob are full sample
+ ## 1:oob auc with ci 
+ ## 2:oob auc without ci 
+ ## 3:oob auc with ci -  auc without ci
+ ## 4:9 oob without ci sensitivity,  specificity, ppv, npv, precision, acc
+ ## 10:15 oob with ci sensitivity,  specificity, ppv, npv, precision, acc
+ ## 16:21 oob delta in ensitivity,  specificity, ppv, npv, precision, acc
 test_stat_acc <- function(data, indicies)  {
   capture.output( 
   {
@@ -314,14 +323,14 @@ test_stat_acc <- function(data, indicies)  {
   dc_home_glm_alt <- glm(data=data[indicies,] , formula=cogform,  family=binomial() ) 
   predict_alt <- predict(dc_home_glm_alt,holdout)
   
-  cutpoint_null <- cutpointr(x=predict_null, class=holdout$thisout , metric=youden)
+  cutpoint_null <- cutpointr(x=predict_null, class=holdout$thisout , metric=youden, pos_class=TRUE, neg_class=FALSE)
   cutpoint_null %<>% add_metric( list(ppv, npv, precision))
   
 #   sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(predict(cutpoint_null, newdata=data.frame(x=predict_alt)), hosp_proc$dc_status!="home")), c("tn","fp","fn","tp") ) ) ) )
 
   null_stats <- cutpoint_null %>% select(sensitivity,  specificity, ppv, npv, precision,acc) %>% as.numeric
   
-  cutpoint_alt <- cutpointr(x=predict_alt, class=holdout$thisout , metric=youden)
+  cutpoint_alt <- cutpointr(x=predict_alt, class=holdout$thisout , metric=youden, pos_class=TRUE, neg_class=FALSE)
   cutpoint_alt %<>% add_metric( list(ppv, npv, precision))
   
 #   alt_stats <- sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(as.numeric(cutpoint_null$optimal_cutpoint) < predict_alt , holdout$thisout ) ), c("tn","fp","fn","tp") ) ) ) )
@@ -341,7 +350,7 @@ test_stat_acc <- function(data, indicies)  {
   return( results)
 }
 
-boot_result_simple <- boot(data=hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=1000)
+boot_result_simple <- boot(data=hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
 
 boot_result_simple %>% saveRDS(file="/research/outputs/mv_binary_acc_boot.RDS")
 
@@ -373,7 +382,7 @@ glm(data=temp_data, formula=cogform , family=binomial() ) -> ci_glm_mv
 
 surgery_v <- vcovCL(ci_glm_mv, cluster = ~SurgeryType , cadjust = FALSE, type="HC1")
 thistest <- coeftest(ci_glm_mv, surgery_v)
-cbind(thistest["AbnCog",, drop=FALSE] , confint(thistest,parm="AbnCog") ) %>% as.data.frame %>% write_csv("/research/outputs/mv_surg_sandwich.csv")
+cbind(thistest["AbnCog",, drop=FALSE] , confint(thistest,parm="AbnCog") ) %>% as.data.frame %>% mutate(OR = round(exp(Estimate), 2), lower_ci_or = round(exp(`2.5 %`) ,2) , upper_ci_or = round(exp(`97.5 %`) ,2)  ) %>% write_csv("/research/outputs/mv_surg_sandwich.csv")
 
 
 
@@ -410,7 +419,7 @@ label_in <- (merged_data2$dc_home )%>% as.numeric
 cv_results_epic <- xgboost_cv(label=label_in, data=train_set %>%   mutate(AD8 = 0., SBT=0.) %>% as.matrix %>% xgb.DMatrix , sobol_size=100, nrounds=50 , 
 upper_bounds= c(10L, .6, 15L, log(5), 8, .99 , log(10), 1L) , 
 lower_bounds = c(4L, .1,  5L, log(0.01), 0, .7  , log(.1) , 1L) , 
-gamma=0 , subsample=1)
+gamma=0 , subsample=1, nthread=8L)
 
 transformed_params  <- set_names(cv_results_epic[[1]], c("max_depth","eta","nrounds","min_child_weight","gamma","subsample","lambda","num_parallel_tree"  ) )
 transformed_params ["min_child_weight"] %<>% exp
@@ -467,9 +476,9 @@ events_rates %>%
   write_csv("/research/outputs/raw_n_epic.csv")  
 
   
-boot_result <- boot(data=train_set, statistic=test_stat, R=1000, labels_in=label_in)
+boot_result <- boot(data=train_set, statistic=test_stat, R=5000, labels_in=label_in)
 
-boot.ci(boot_result, type="basic")
+# boot.ci(boot_result, type="basic")
 boot_result %>% saveRDS(file="/research/outputs/ep_ddml_boot.RDS")
 
 
@@ -490,7 +499,7 @@ myform <- base_form %>%
 
 cogform <- myform %>%  update( "~.+AbnCog" ) 
 
-boot_result_simple <- boot(data=merged_data2 %>% mutate(thisout=dc_home  ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=1000)
+boot_result_simple <- boot(data=merged_data2 %>% mutate(thisout=dc_home  ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
 
 
 boot_result_simple %>% saveRDS(file="/research/outputs/ep_binary_acc_boot.RDS")
@@ -521,7 +530,8 @@ glm(data=temp_data, formula=cogform , family=binomial() ) -> ci_glm_ep
 
 surgery_v <- vcovCL(ci_glm_ep, cluster = ~surgType , cadjust = FALSE, type="HC1")
 thistest <- coeftest(ci_glm_ep, surgery_v)
-cbind(thistest["AbnCog",, drop=FALSE] , confint(thistest,parm="AbnCog") ) %>% as.data.frame %>% write_csv("/research/outputs/ep_surg_sandwich.csv")
+
+cbind(thistest["AbnCog",, drop=FALSE] , confint(thistest,parm="AbnCog") ) %>% as.data.frame %>% mutate(OR = round(exp(Estimate), 2), lower_ci_or = round(exp(`2.5 %`) ,2) , upper_ci_or = round(exp(`97.5 %`) ,2)  ) %>% write_csv("/research/outputs/ep_surg_sandwich.csv")
 
 
 
