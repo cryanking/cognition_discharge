@@ -291,6 +291,8 @@ myform <- base_form %>%
   update( "~.+predict(global_age_spline,Age_at_CPAP)" ) 
 
 cogform <- myform %>%  update( "~.+AbnCog" ) 
+cogformA <- myform %>%  update( "~.+AD8" ) 
+cogformS <- myform %>%  update( "~.+SBT" ) 
 
 #   dc_home_glm <- hosp_proc %>% mutate(thisout=dc_status!="home") %>% mutate(AbnCog= as.numeric(AbnCog)) %>% glm(data=., formula=myform,  family=binomial() ) 
 #   predict_null <- predict(dc_home_glm, newdata=hosp_proc %>% mutate(AbnCog= as.numeric(AbnCog)) , type="response")
@@ -349,6 +351,54 @@ test_stat_acc <- function(data, indicies)  {
 #   sink( type="message")
   return( results)
 }
+
+
+test_stat_acc2 <- function(data, indicies)  {
+  capture.output( 
+  {
+#   sink(file="/dev/null", type="message")
+  if(length(setdiff(indicies, seq.int(nrow(data)))) ==0 ) {
+  holdout <- data
+  } else {
+  holdout <- data[-unique(indicies),]  
+  }
+
+  dc_home_glm <- data[indicies,] %>% glm(data=., formula=cogformA,  family=binomial() ) 
+  predict_null <- predict(dc_home_glm,holdout)
+
+  dc_home_glm_alt <- glm(data=data[indicies,] , formula=cogformS,  family=binomial() ) 
+  predict_alt <- predict(dc_home_glm_alt,holdout)
+  
+  cutpoint_null <- cutpointr(x=predict_null, class=holdout$thisout , metric=youden, pos_class=TRUE, neg_class=FALSE)
+  cutpoint_null %<>% add_metric( list(ppv, npv, precision))
+  
+#   sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(predict(cutpoint_null, newdata=data.frame(x=predict_alt)), hosp_proc$dc_status!="home")), c("tn","fp","fn","tp") ) ) ) )
+
+  null_stats <- cutpoint_null %>% select(sensitivity,  specificity, ppv, npv, precision,acc) %>% as.numeric
+  
+  cutpoint_alt <- cutpointr(x=predict_alt, class=holdout$thisout , metric=youden, pos_class=TRUE, neg_class=FALSE)
+  cutpoint_alt %<>% add_metric( list(ppv, npv, precision))
+  
+#   alt_stats <- sapply( list(sensitivity,  specificity, ppv, npv, precision),  function(X)  do.call(X, as.list(set_names(as.vector(table(as.numeric(cutpoint_null$optimal_cutpoint) < predict_alt , holdout$thisout ) ), c("tn","fp","fn","tp") ) ) ) )
+  alt_stats <- cutpoint_alt %>% select(sensitivity,  specificity, ppv, npv, precision, acc) %>% as.numeric
+  
+  results <- c( 
+    pROC::auc(response=holdout$thisout,predictor=predict_alt, levels=c(FALSE, TRUE) ) ,
+    pROC::auc(response=holdout$thisout,predictor=predict_null, levels=c(FALSE, TRUE) ) , 
+    pROC::auc(response=holdout$thisout,predictor=predict_alt, levels=c(FALSE, TRUE) ) - pROC::auc(response=holdout$thisout,predictor=predict_null, levels=c(FALSE, TRUE) ) , 
+    null_stats,
+    alt_stats,
+    alt_stats - null_stats
+  )
+  } 
+  , type="message")
+#   sink( type="message")
+  return( results)
+}
+
+ad8_vs_sbt_mv <- boot(data=hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% filter(is.finite(AD8))%>% filter(is.finite(SBT)),  statistic=test_stat_acc2, R=1000)
+ad8_vs_sbt_mv %>% saveRDS(file="/research/outputs/ad8_vs_sbt_mv.RDS")
+
 
 boot_result_simple <- boot(data=hosp_proc %>% mutate(thisout=(dc_status!="home") ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
 
@@ -498,6 +548,12 @@ myform <- base_form %>%
   update( "~.+predict(global_age_spline,age)" ) 
 
 cogform <- myform %>%  update( "~.+AbnCog" ) 
+cogformA <- myform %>%  update( "~.+AD8" ) 
+cogformS <- myform %>%  update( "~.+SBT" ) 
+
+ad8_vs_sbt_ep <- boot(data=merged_data2 %>% mutate(thisout=dc_home  ) %>% filter(is.finite(AD8))%>% filter(is.finite(SBT)),  statistic=test_stat_acc2, R=1000)
+ad8_vs_sbt_ep %>% saveRDS(file="/research/outputs/ad8_vs_sbt_ep.RDS")
+
 
 boot_result_simple <- boot(data=merged_data2 %>% mutate(thisout=dc_home  ) %>% mutate(AbnCog= as.numeric(AbnCog)),  statistic=test_stat_acc, R=5000)
 
